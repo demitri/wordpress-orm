@@ -40,10 +40,13 @@ class Page(WPEntity):
 
 	@property
 	def schema_fields(self):
-		return ["date", "date_gmt", "guid", "id", "link", "modified", "modified_gmt",
-			   "slug", "status", "type", "password", "parent", "title", "content", "author",
-			   "excerpt", "featured_media", "comment_status", "ping_status", "menu_order",
-			   "meta", "template"]
+		if self._schema_fields is None:
+			# These are the default WordPress fields for the "page" object.
+			self._schema_fields = ["date", "date_gmt", "guid", "id", "link", "modified", "modified_gmt",
+									"slug", "status", "type", "password", "parent", "title", "content", "author",
+									"excerpt", "featured_media", "comment_status", "ping_status", "menu_order",
+									"meta", "template"]
+		return self._schema_fields
 
 	@property
 	def featured_media(self):
@@ -114,11 +117,14 @@ class PageRequest(WPRequest):
 		'''
 		Page request parameters.
 		'''
-		return ["context", "page", "per_page", "search", "after", "author",
-				"author_exclude", "before", "exclude", "include", "menu_order", "offset",
-				"order", "orderby", "parent", "parent_exclude", "slug", "status"]
+		if self._parameter_names is None:
+			# parameter names defined by WordPress page query
+			self._parameter_names = ["context", "page", "per_page", "search", "after", "author",
+									"author_exclude", "before", "exclude", "include", "menu_order", "offset",
+									"order", "orderby", "parent", "parent_exclude", "slug", "status"]
+		return self._parameter_names
 
-	def get(self, count=False):
+	def get(self, classobject=Page, count=False):
 		'''
 		Returns a list of 'Page' objects that match the parameters set in this object.
 
@@ -213,7 +219,8 @@ class PageRequest(WPRequest):
 			except WPORMCacheObjectNotFoundError:
 				pass
 
-			page = Page(api=self.api)
+			page = classobject.__new__(classobject)
+			page.__init__(api=self.api)
 			page.json = d
 
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
@@ -265,10 +272,11 @@ class PageRequest(WPRequest):
 				logger.debug(request_context)
 				raise NotImplementedError
 
+			# Allow postprocessing for custom fields
+			page.postprocess_response()
 			# add to cache
 			self.api.wordpress_object_cache.set(class_name=Page.__name__, key=page.s.id, value=page)
 			self.api.wordpress_object_cache.set(class_name=Page.__name__, key=page.s.slug, value=page)
-
 
 			pages.append(page)
 

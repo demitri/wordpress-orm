@@ -12,16 +12,16 @@ from ..cache import WPORMCacheObjectNotFoundError
 logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
 
 class User(WPEntity):
-	
+
 	def __init__(self, id=None, session=None, api=None):
 		super().__init__(api=api)
-		
+
 		# parameters that undergo validation, i.e. need custom setter
 		self._context = None
 
 		# cache related objects
 		self._posts = None
-		
+
 	@property
 	def schema_fields(self):
 		if self._schema_fields is None:
@@ -41,29 +41,29 @@ class User(WPEntity):
 
 	def __repr__(self):
 		return "<WP {0} object at {1}, id={2}, name='{3}'>".format(self.__class__.__name__, hex(id(self)), self.s.id, self.s.name)
-	
+
 	def gravatar_url(self, size=200, rating='g', default_image_style="mm"):
 		'''
 		Returns a URL to the Gravatar image associated with the user's email address.
-		
+
 		Ref: https://en.gravatar.com/site/implement/images/
-		
+
 		size: int, can be anything from 1 to 2048 px
 		rating: str, maximum rating of the image, one of ['g', 'pg', 'r', 'x']
 		default_image: str, type of image if gravatar image doesn't exist, one of ['404', 'mm', 'identicon', 'monsterid', 'wavatar', 'retro', 'robohash', 'blank']
 		'''
 		if rating not in ['g', 'pg', 'r', 'x']:
 			raise ValueError("The gravatar max rating must be one of ['g', 'pg', 'r', 'x'].")
-		
+
 		if default_image_style not in ['404', 'mm', 'identicon', 'monsterid', 'wavatar', 'retro', 'robohash', 'blank']:
-			raise ValueError("The gravatar default image style must be one of ['404', 'mm', 'identicon', 'monsterid', 'wavatar', 'retro', 'robohash', 'blank'].")			
-		
+			raise ValueError("The gravatar default image style must be one of ['404', 'mm', 'identicon', 'monsterid', 'wavatar', 'retro', 'robohash', 'blank'].")
+
 		if not isinstance(size, int):
 			try:
 				size = int(size)
 			except ValueError:
 				raise ValueError("The size parameter must be an integer value between 1 and 2048.")
-		
+
 		if isinstance(size, int):
 			if 1 <= size <= 2048:
 				#
@@ -77,25 +77,25 @@ class User(WPEntity):
 				params.append("d={0}".format(default_image_style)) # set default image to 'mystery man'
 				params.append("r={0}".format(rating)) # set max rating to 'g'
 				params.append("s={0}".format(size))
-				
+
 				return "{0}?{1}".format(grav_url_base, "&".join(params))
 		else:
 			raise ValueError("The size parameter must be an integer.")
-		
+
 	@property
 	def fullname(self):
 		return "{0} {1}".format(self.s.first_name, self.s.last_name)
-	
+
 
 class UserRequest(WPRequest):
 	'''
-	
+
 	'''
 	def __init__(self, api=None):
 		super().__init__(api=api)
 		self.id = None # WordPress ID
 		self._slugs = list() # can accept more than one
-				
+
 	@property
 	def parameter_names(self):
 		if self._parameter_names is None:
@@ -103,11 +103,11 @@ class UserRequest(WPRequest):
 			self._parameter_names = ["context", "page", "per_page", "search", "exclude",
 									 "include", "offset", "order", "orderby", "slug", "roles"]
 		return self._parameter_names
-		
+
 	@property
 	def slug(self):
 		return self._slugs
-	
+
 	@slug.setter
 	def slug(self, value):
 		if value is None:
@@ -125,10 +125,10 @@ class UserRequest(WPRequest):
 		'''
 		'''
 		self.url = self.api.base_url + 'users'
-		
+
 		if self.id:
 			self.url += "/{}".format(self.id)
-				
+
 		# -------------------
 		# populate parameters
 		# -------------------
@@ -140,7 +140,7 @@ class UserRequest(WPRequest):
 
 		if len(self.slug) > 1:
 			self.parameters["slug"] = ",".join(self.slug)
-		
+
 		if self.search:
 			self.parameters["search"] = self.search
 
@@ -157,11 +157,11 @@ class UserRequest(WPRequest):
 				return None
 
 		users_data = self.response.json()
-		
+
 		if isinstance(users_data, dict):
 			# only one object was returned; make it a list
 			users_data = [users_data]
-	
+
 		users = list()
 		for d in users_data:
 
@@ -176,7 +176,7 @@ class UserRequest(WPRequest):
 			user = classobject.__new__(classobject)
 			user.__init__(api=self.api)
 			user.json = d
-			
+
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#
 			#   "id", "name", "url", "description", "link", "slug", "avatar_urls"
@@ -193,7 +193,7 @@ class UserRequest(WPRequest):
 			#
 			if request_context in ["view", "edit"]:
 				user.meta = d["meta"]
-			
+
 			# Properties applicable to only 'edit' query contexts
 			#
 			if request_context in ["edit"]:
@@ -207,11 +207,10 @@ class UserRequest(WPRequest):
 				user.s.roles = d["roles"]
 				user.s.capabilities = d["capabilities"]
 				user.s.extra_capabilities = d["extra_capabilities"]
-			
+
 			# allow subclasses to process single entity
-			#print("json: {0}".format(user.json))
 			user.postprocess_response()
-			
+
 			# add to cache
 			self.api.wordpress_object_cache.set(class_name=User.__name__, key=str(user.s.id), value=user)
 			self.api.wordpress_object_cache.set(class_name=User.__name__, key=user.s.slug, value=user)
@@ -223,7 +222,7 @@ class UserRequest(WPRequest):
 	@property
 	def context(self):
 		return self._context
-	
+
 	@context.setter
 	def context(self, value):
 		if value is None:
@@ -238,11 +237,3 @@ class UserRequest(WPRequest):
 			except:
 				pass
 		raise ValueError ("'context' may only be one of ['view', 'embed', 'edit'] ('{0}' given)".format(value))
-				
-			
-
-
-
-
-
-

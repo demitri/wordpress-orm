@@ -35,8 +35,11 @@ class Tag(WPEntity):
 
 	@property
 	def schema_fields(self):
-		return ["id", "count", "description", "link",
-			   "name", "slug", "taxonomy", "meta"]
+		if self._schema_fields is None:
+			# These are the default WordPress fields for the "user" object.
+			self._schema_fields = ["id", "count", "description", "link",
+									"name", "slug", "taxonomy", "meta"]
+		return self._schema_fields
 
 class TagRequest(WPRequest):
 	'''
@@ -66,13 +69,13 @@ class TagRequest(WPRequest):
 
 	@property
 	def parameter_names(self):
-		'''
-		Page request parameters.
-		'''
-		return ["context", "page", "per_page", "search", "exclude", "include", "offset",
-				"order", "orderby", "hide_empty", "post", "slug"]
+		if self._parameter_names is None:
+			# parameter names defined by WordPress user query
+			self._parameter_names = ["context", "page", "per_page", "search", "exclude", "include", "offset",
+										"order", "orderby", "hide_empty", "post", "slug"]
+		return self._parameter_names
 
-	def get(self, count=False):
+	def get(self, classobject=Tag, count=False):
 		'''
 		Returns a list of 'Tag' objects that match the parameters set in this object.
 
@@ -162,7 +165,8 @@ class TagRequest(WPRequest):
 			except WPORMCacheObjectNotFoundError:
 				pass
 
-			tag = Tag(api=self.api)
+			tag = classobject.__new__(classobject)
+			tag.__init__(api=self.api)
 			tag.json = d
 
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
@@ -184,6 +188,8 @@ class TagRequest(WPRequest):
 				tag.s.description = d["description"]
 				tag.s.meta = d["meta"]
 
+			# Allow postprocessing for custom fields
+			tag.postprocess_response()
 			# add to cache
 			self.api.wordpress_object_cache.set(class_name=Tag.__name__, key=tag.s.id, value=tag)
 			self.api.wordpress_object_cache.set(class_name=Tag.__name__, key=tag.s.slug, value=tag)
