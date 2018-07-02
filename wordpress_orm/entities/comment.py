@@ -136,7 +136,7 @@ class CommentRequest(WPRequest):
 				pass
 
 			comment = Comment(api=self.api)
-			comment.json = d
+			comment.json = json.dumps(d)
 			
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#

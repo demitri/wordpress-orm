@@ -154,7 +154,7 @@ class CategoryRequest(WPRequest):
 				pass
 
 			category = Category(api=self.api)
-			category.json = d
+			category.json = json.dumps(d)
 			
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#

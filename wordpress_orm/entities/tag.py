@@ -163,7 +163,7 @@ class TagRequest(WPRequest):
 				pass
 
 			tag = Tag(api=self.api)
-			tag.json = d
+			tag.json = json.dumps(d)
 
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#

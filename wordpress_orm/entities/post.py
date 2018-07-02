@@ -248,7 +248,7 @@ class PostRequest(WPRequest):
 				pass
 			
 			post = Post(api=self.api)
-			post.json = d
+			post.json = json.dumps(d)
 			
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#

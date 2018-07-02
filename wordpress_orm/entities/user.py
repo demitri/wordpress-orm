@@ -3,6 +3,7 @@
 WordPress API reference: https://developer.wordpress.org/rest-api/reference/posts/
 '''
 
+import json
 import logging
 import requests
 
@@ -175,7 +176,7 @@ class UserRequest(WPRequest):
 
 			user = classobject.__new__(classobject)
 			user.__init__(api=self.api)
-			user.json = d
+			user.json = json.dumps(d)
 			
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#

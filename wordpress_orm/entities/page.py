@@ -214,7 +214,7 @@ class PageRequest(WPRequest):
 				pass
 
 			page = Page(api=self.api)
-			page.json = d
+			page.json = json.dumps(d)
 
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#
