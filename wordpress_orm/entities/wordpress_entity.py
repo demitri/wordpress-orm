@@ -92,10 +92,10 @@ class WPRequest(metaclass=ABCMeta):
 			if self.api.session is None:
 				print("creating new request")
 				# no exiting request, create a new one
-				self.response = requests.get(url=self.url, params=self.parameters)
+				self.response = requests.get(url=self.url, params=self.parameters, auth=self.api.auth())
 			else:
 				# use existing session
-				self.response = self.api.session.get(url=self.url, params=self.parameters)
+				self.response = self.api.session.get(url=self.url, params=self.parameters, auth=self.api.auth())
 		self.response.raise_for_status()
 		#return self.response
 		

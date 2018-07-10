@@ -37,7 +37,14 @@ class API:
 	def __init__(self, url=None):
 		self.base_url = url
 		self.session = None
-
+		
+		# A valid "requests" authentication handler,
+		# see: http://docs.python-requests.org/en/master/api/?highlight=get#authentication
+		#
+		# Options: HTTPBasicAuth(username, password), HTTPProxyAuth(username, password), HTTPDigestAuth(username, password)
+		#
+		self.authenticator = None
+		
 		self.wordpress_object_cache = WPORMCache() # dict() # key = class name, value = object
 
 		#
@@ -64,6 +71,14 @@ class API:
 #		if class_name not in self.wordpress_object_cache:
 #			self.wordpress_object_cache[class_name] = dict()
 
+	def auth(self):
+		'''
+		Returns a valid requests authentication handler.
+		'''
+		if self.authenticator is None or isinstance(self.authenticator, requests.auth.AuthBase):
+			return self.authenticator
+		else:
+			raise Exception("Unknown or unsupported authentication method.")
 
 	def PostRequest(self, **kwargs):
 		''' Factory method that returns a new PostRequest attached to this API. '''
