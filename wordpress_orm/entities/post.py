@@ -134,6 +134,7 @@ class PostRequest(WPRequest):
 		self._orderby = None
 		self._page = None
 		self._per_page = None
+		self._sticky = False
 		
 		self._status = list()
 		self._author_ids = list()
@@ -142,7 +143,8 @@ class PostRequest(WPRequest):
 		self._slugs = list()
 		self._category_ids = list()
 		self._categories_exclude_ids = list()
-		# self._tags = list() # IDs or terms?
+		self._tags = list() # list of IDs of tags
+		self._tags_exclude = list() # list of IDs of tags
 				
 		if categories:
 			self.categories = categories
@@ -245,9 +247,13 @@ class PostRequest(WPRequest):
 			self.parameters["tags"] = ",".join(self.tags)
 
 		# tags_exclude : Limit result set to all items except those that have the specified term assigned in the tags taxonomy.
-			
+		if len(self.tags_exclude) > 0:
+			self.parameters["tags_exclude"] = ",".join(self.tags_exclude)
+					
 		# sticky : Limit result set to items that are sticky.
-
+		if self.sticky:
+			self.parameters["sticky"] = "1"
+		
 		# -------------------
 
 		try:
@@ -552,7 +558,8 @@ class PostRequest(WPRequest):
 	def include(self):
 		return self._includes
 
-	@include.setter(self, values):
+	@include.setter
+	def include(self, values):
 		'''
 		Limit result set to specified WordPress user IDs, provided as a list.
 		'''
@@ -618,7 +625,7 @@ class PostRequest(WPRequest):
 
 	@property
 	def orderby(self):
-		return self.api_params.get('orderby', None)
+		return self._orderby # parameters.get('orderby', None)
 		
 	@orderby.setter
 	def orderby(self, value):
@@ -787,16 +794,69 @@ class PostRequest(WPRequest):
 	@tags.setter
 	def tags(self, values):
 		'''
-		List of tags that are required to be attached to items returned from query.
+		List of tag IDs that are required to be attached to items returned from query.
 		'''
-		raise Exception("Not yet implemented - are these WordPress IDs as well?")
+		if values is None:
+			self.parameters.pop("tags", None)
+			self._tags = list()
+			return
+		elif not isinstance(values, list):
+			raise ValueError("Tags must be provided as a list of IDs (or append to the existing list).")
+		
+		for tag_id in values:
+			if isinstance(tag_id, int):
+				self.tags.append(tag_id)
+			elif isinstance(tag_id, str):
+				try:
+					self.tags.append(str(int(tag_id)))
+				except ValueError:
+					raise ValueError("The given tag was in the form of a string but could not be converted to an integer ('{0}').".format(tag_id))
+			else:
+				raise ValueError("Unexpected type for property list 'tags'; expected str or int, got '{0}'".format(type(s)))			
 
+	@property
+	def tags_exclude(self):
+		'''
+		Return only items that do not have these tags.
+		'''
+		return self._tags_exclude
+		
+	@tags.setter
+	def tags_exclude(self, values):
+		'''
+		List of tag IDs attached to items to be excluded from query.
+		'''
+		if values is None:
+			self.parameters.pop("tags", None)
+			self._tags_exclude = list()
+			return
+		elif not isinstance(values, list):
+			raise ValueError("Tags must be provided as a list of IDs (or append to the existing list).")
+		
+		for tag_id in values:
+			if isinstance(tag_id, int):
+				self._tags_exclude.append(tag_id)
+			elif isinstance(tag_id, str):
+				try:
+					self._tags_exclude.append(str(int(tag_id)))
+				except ValueError:
+					raise ValueError("The given tag was in the form of a string but could not be converted to an integer ('{0}').".format(tag_id))
+			else:
+				raise ValueError("Unexpected type for property list 'tags'; expected str or int, got '{0}'".format(type(s)))
 
-
-
-
-
-
+	@property
+	def sticky(self):
+		'''
+		If 'True', limits result set to items that are sticky.
+		'''
+		return self._sticky
+		
+	@sticky.setter
+	def sticky(self, value):
+		'''
+		Set to 'True' to limit result set to items that are sticky.
+		'''
+		self._sticky = (value == True)
 
 
 

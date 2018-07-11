@@ -310,7 +310,8 @@ class UserRequest(WPRequest):
 	def include(self):
 		return self._includes
 
-	@include.setter(self, values):
+	@include.setter
+	def include(self, values):
 		'''
 		Limit result set to specified WordPress user IDs, provided as a list.
 		'''
@@ -377,7 +378,7 @@ class UserRequest(WPRequest):
 
 	@property
 	def orderby(self):
-		return self.api_params.get('orderby', None)
+		return self._orderby #api_params.get('orderby', None)
 		
 	@orderby.setter
 	def orderby(self, value):
@@ -426,7 +427,7 @@ class UserRequest(WPRequest):
 	@roles.setter
 	def roles(self, values):
 		if values is None:
-			self._parameters.pop("roles", None)
+			self.parameters.pop("roles", None)
 			self._roles = list()
 			return
 		elif not isinstance(values, list):
