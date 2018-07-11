@@ -434,7 +434,7 @@ class UserRequest(WPRequest):
 			raise ValueError("Roles must be provided as a list (or append to the existing list).")
 		
 		for role in values:
-			if isinstance(s.str):
+			if isinstance(role, str):
 				self.roles.append(role)
 			else:
 				raise ValueError("Unexpected type for property list 'roles'; expected str, got '{0}'".format(type(s)))
