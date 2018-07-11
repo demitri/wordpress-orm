@@ -139,6 +139,12 @@ class UserRequest(WPRequest):
 		else:
 			request_context = "view" # default value
 
+		if self.page:
+			self.parameters["page"] = self.page
+		
+		if self.per_page:
+			self.parameters["per_page"] = self.per_page
+
 		if len(self.slug) > 1:
 			self.parameters["slug"] = ",".join(self.slug)
 		
@@ -240,6 +246,44 @@ class UserRequest(WPRequest):
 				pass
 		raise ValueError ("'context' may only be one of ['view', 'embed', 'edit'] ('{0}' given)".format(value))
 				
+	@property
+	def page(self):
+		'''
+		Current page of the collection.
+		'''
+		return self._page
+		
+	@page.setter
+	def page(self, value):
+		#
+		# only accept integers or strings that can become integers
+		#
+		if isinstance(value, int):
+			self._page = value
+		elif isinstance(value, str):
+			try:
+				self._page = int(value)
+			except ValueError:
+				raise ValueError("The 'page' parameter must be an integer, was given '{0}'".format(value))
+
+	@property
+	def per_page(self):
+		'''
+		Maximum number of items to be returned in result set.
+		'''
+		return self._per_page
+		
+	@per_page.setter
+	def per_page(self, value):
+		# only accept integers or strings that can become integers
+		#
+		if isinstance(value, int):
+			self._per_page = value
+		elif isinstance(value, str):
+			try:
+				self._per_page = int(value)
+			except ValueError:
+				raise ValueError("The 'per_page' parameter must be an integer, was given '{0}'".format(value))
 			
 
 
