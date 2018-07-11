@@ -129,6 +129,7 @@ class PostRequest(WPRequest):
 		# parameters that undergo validation, i.e. need custom setter
 		self._after = None
 		self._before = None
+		self._offset = None
 		self._order = None
 		self._orderby = None
 		self._page = None
@@ -136,10 +137,13 @@ class PostRequest(WPRequest):
 		
 		self._status = list()
 		self._author_ids = list()
+		self._author_exclude = list()
+		self._includes = list()
+		self._slugs = list()
 		self._category_ids = list()
 		self._categories_exclude_ids = list()
-		self._slugs = list()
-		
+		# self._tags = list() # IDs or terms?
+				
 		if categories:
 			self.categories = categories
 		if slugs:
@@ -195,21 +199,55 @@ class PostRequest(WPRequest):
 			# takes a list of author IDs
 			self.parameters["author"] = ",".join(self.author)
 		
-		if len(self.status) > 0:
-			self.parameters["status"] = ",".join(self.status)
+		# author_exclude : Ensure result set excludes posts assigned to specific authors.
+		if len(self.author_exclude) > 0:
+			self.parameters["author_exclude"] = ",".join(self.author_exclude)
 			
-		if self.slug:
-			self.parameters["slug"] = self.slug
+		# before : Limit response to posts published before a given ISO8601 compliant date.
 		
-		if len(self.categories) > 0:
-			self.parameters["categories"] = ",".join(self.categories)
+		# exclude : Ensure result set excludes specific IDs.
 		
-		if len(self.categories_exclude) > 0:
-			self.parameters["categories_exclude"] = ",".join(self.categories_exclude)
+		# include : Limit result set to specific IDs.
+		if len(self.include) > 0:
+			self.parameters["include"] = ",".join(self.include)
 		
+		# offset : Offset the result set by a specific number of items.
+		if self.offset:
+			self.parameters["offset"] = self.offset
+
+		# order : Order sort attribute ascending or descending. Default: desc, one of: asc, desc
 		if self.order:
 			self.parameters["order"] = self.order
-					
+
+		# orderby : Sort collection by object attribute, default "date", One of: author, date, id, include, modified, parent, relevance, slug, title
+		if self.orderby:
+			self.parameters["orderby"] = self.orderby
+
+		# slug : Limit result set to posts with one or more specific slugs.
+		if self.slug:
+			self.parameters["slug"] = self.slug
+			
+		# status : Limit result set to posts assigned one or more statuses. (default: publish)
+
+		if len(self.status) > 0:
+			self.parameters["status"] = ",".join(self.status)
+
+		# categories : Limit result set to all items that have the specified term assigned in the categories taxonomy.
+		if len(self.categories) > 0:
+			self.parameters["categories"] = ",".join(self.categories)
+
+		# categories_exclude : Limit result set to all items except those that have the specified term assigned in the categories taxonomy.
+		if len(self.categories_exclude) > 0:
+			self.parameters["categories_exclude"] = ",".join(self.categories_exclude)
+
+		# tags : Limit result set to all items that have the specified term assigned in the tags taxonomy. 
+		if len(self.tags) > 0:
+			self.parameters["tags"] = ",".join(self.tags)
+
+		# tags_exclude : Limit result set to all items except those that have the specified term assigned in the tags taxonomy.
+			
+		# sticky : Limit result set to items that are sticky.
+
 		# -------------------
 
 		try:
@@ -417,6 +455,54 @@ class PostRequest(WPRequest):
 		self._author_ids.append(author_id)
 
 	@property
+	def author_exclude(self):
+		return self._author_exclude
+		
+	@author_exclude.setter
+	def author_exclude(self, value):
+		'''
+		Set author to exclude from this query; stores WordPress user ID.
+		'''
+		author_id = None
+		
+		# plan: define author_id, append to "self._author_ids" list below
+		
+		if value is None:
+			self.parameters.pop("author_exclude", None) # remove key
+			return
+			#self.g = None
+
+		elif isinstance(value, User):
+			# a single user was given, replace any existing list with this one
+			self._author_exclude = list()
+			author_id = value.s.id
+
+		elif isinstance(value, int):
+			# a single id was given, replace any existing list with this one
+			self._author_exclude = list()
+			author_id = value # assuming WordPress ID
+			#self.parameters["author"] = value
+			#self._author = value
+
+		elif isinstance(value, str):
+			# is this string value the WordPress user ID?
+			try:
+				author_id = int(value)
+			except ValueError:
+				# nope, see if it's the username and get the User object
+				try:
+					user = self.api.user(username=value)
+					author_id = user.s.id
+				except exc.NoEntityFound:
+					raise ValueError("Could not determine a user from the value: '{0}' (type '{1}')".format(value, type(value)))
+							
+		else:
+			raise ValueError("Unexpected value type passed to 'author_exclude' (type: '{1}')".format(type(value)))
+		
+		assert author_id is not None, "Could not determine author_id from value '{0}'.".format(value)
+		self._author_exclude.append(author_id)
+
+	@property
 	def after(self):
 		'''
 		WordPress parameter to return posts after this date.
@@ -461,6 +547,50 @@ class PostRequest(WPRequest):
 			self._before = value
 		else:
 			raise ValueError("The 'before' property only accepts `datetime` objects.")
+
+	@property
+	def include(self):
+		return self._includes
+
+	@include.setter(self, values):
+		'''
+		Limit result set to specified WordPress user IDs, provided as a list.
+		'''
+		if values is None:
+			self.parameters.pop("include", None)
+			self._includes = list()
+			return
+		elif not isinstance(values, list):
+			raise ValueError("Includes must be provided as a list (or append to the existing list).")
+		
+		for inc in values:
+			if isinstance(inc, int):
+				self._includes.append(str(inc))
+			elif isinstance(inc, str):
+				try:
+					self._includes.append(str(int(inc)))
+				except ValueError:
+					raise ValueError("The WordPress ID (an integer, '{0}' given) must be provided to limit result to specific users.".format(inc))
+
+	@property
+	def offset(self):
+		return self._offset
+		
+	@offset.setter
+	def offset(self, value):
+		'''
+		Set value to offset the result set by the specified number of items.
+		'''
+		if value is None:
+			self.parameters.pop("offset", None)
+			self._offset = None
+		elif isinstance(value, int):
+			self._offset = value
+		elif isinstance(value, str):
+			try:
+				self._offset = str(int(str))
+			except ValueError:
+				raise ValueError("The 'offset' value should be an integer, was given: '{0}'.".format(value))
 
 	@property
 	def order(self):
@@ -508,6 +638,28 @@ class PostRequest(WPRequest):
 				raise ValueError('The "orderby" parameter must be one of these '+\
 								 'values: {} (or None).'.format(orderby_values))
 		return self._orderby
+
+	@property
+	def slugs(self):
+		'''
+		The list of post slugs to retrieve.
+		'''
+		return self._slugs
+		
+	@slugs.setter
+	def slugs(self, values):
+		if values is None:
+			self.parameters.pop("slugs", None)
+			self._slugs = list()
+			return
+		elif not isinstance(values, list):
+			raise ValueError("Slugs must be provided as a list (or append to the existing list).")
+		
+		for s in values:
+			if isinstance(s, str):
+				self._slugs.append(s)
+			else:
+				raise ValueError("Unexpected type for property list 'slugs'; expected str, got '{0}'".format(type(s)))
 
 	@property
 	def status(self):
@@ -626,38 +778,18 @@ class PostRequest(WPRequest):
 			self._category_exclude_ids.append(str(cat_id))
 
 	@property
-	def slugs(self):
+	def tags(self):
 		'''
-		The list of post slugs to retrieve.
+		Return only items that have these tags.
 		'''
-		return self._slugs
+		return self._tags
 		
-	@slugs.setter
-	def slugs(self, values):
-		if values is None:
-			self.parameters.pop("slugs", None)
-			self._slugs = list()
-			return
-		elif not isinstance(values, list):
-			raise ValueError("Slugs must be provided as a list (or append to the existing list).")
-		
-		for s in values:
-			if isinstance(s, str):
-				self._slugs.append(s)
-			else:
-				raise ValueError("Unexpected type for property list 'slugs'; expected str, got '{0}'".format(type(s)))
-
-
-
-
-
-
-
-
-
-
-
-
+	@tags.setter
+	def tags(self, values):
+		'''
+		List of tags that are required to be attached to items returned from query.
+		'''
+		raise Exception("Not yet implemented - are these WordPress IDs as well?")
 
 
 

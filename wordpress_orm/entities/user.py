@@ -95,7 +95,16 @@ class UserRequest(WPRequest):
 	def __init__(self, api=None):
 		super().__init__(api=api)
 		self.id = None # WordPress ID
+		self._page = None
+		self._per_page = None
+		self._offset = None
+		self._order = None
+		self._orderby = None
+		
+		# parameters that undergo validation, i.e. need custom setter
+		self._includes = list()
 		self._slugs = list() # can accept more than one
+		self._roles = list()
 				
 	@property
 	def parameter_names(self):
@@ -104,23 +113,8 @@ class UserRequest(WPRequest):
 			self._parameter_names = ["context", "page", "per_page", "search", "exclude",
 									 "include", "offset", "order", "orderby", "slug", "roles"]
 		return self._parameter_names
-		
-	@property
-	def slug(self):
-		return self._slugs
 	
-	@slug.setter
-	def slug(self, value):
-		if value is None:
-			self._slugs = list()
-		elif isinstance(value, str):
-			self._slugs.append(value)
-		elif isinstance(value, list):
-			# validate data type
-			for v in value:
-				if not isinstance(v, str):
-					raise ValueError("slugs must be string type; found '{0}'".format(type(v)))
-			self._slugs = value
+	# ========================================= perform query ==================================
 
 	def get(self, classobject=User):
 		'''
@@ -145,11 +139,36 @@ class UserRequest(WPRequest):
 		if self.per_page:
 			self.parameters["per_page"] = self.per_page
 
-		if len(self.slug) > 1:
-			self.parameters["slug"] = ",".join(self.slug)
-		
 		if self.search:
 			self.parameters["search"] = self.search
+
+		# exclude : Ensure result set excludes specific IDs.
+		if self.search:
+			self.parameters["exclude"] = self.search
+
+		# include : Limit result set to specific IDs.
+		if len(self._includes) > 0:
+			self.parameters["include"] = ",".join.self._includes
+			
+		# offset : Offset the result set by a specific number of items.
+		if self.offset:
+			self.parameters["offset"] = self.search
+		
+		# order : Order sort attribute ascending or descending, default "asc", one of ["asc", "desc"]
+		if self.order:
+			self.parameters["order"] = self.order
+		
+		# orderby : Sort collection by object attribute.
+		if self.orderby:
+			self.parameters["orderby"] = self.orderby
+
+		# slug : Limit result set to users with one or more specific slugs.
+		if len(self.slug) > 0:
+			self.parameters["slug"] = ",".join(self.slug)
+		
+		# roles : Limit result set to users matching at least one specific role provided. Accepts csv list or single role.
+		if len(self.roles) > 0:
+			self.parameters["roles"] = ",".join(self.roles)
 
 		# -------------------
 
@@ -227,6 +246,8 @@ class UserRequest(WPRequest):
 
 		return users
 
+	# ================================= query properties ==============================
+	
 	@property
 	def context(self):
 		return self._context
@@ -284,6 +305,138 @@ class UserRequest(WPRequest):
 				self._per_page = int(value)
 			except ValueError:
 				raise ValueError("The 'per_page' parameter must be an integer, was given '{0}'".format(value))
+
+	@property
+	def include(self):
+		return self._includes
+
+	@include.setter(self, values):
+		'''
+		Limit result set to specified WordPress user IDs, provided as a list.
+		'''
+		if values is None:
+			self.parameters.pop("include", None)
+			self._includes = list()
+			return
+		elif not isinstance(values, list):
+			raise ValueError("Includes must be provided as a list (or append to the existing list).")
+		
+		for inc in values:
+			if isinstance(inc, int):
+				self._includes.append(str(inc))
+			elif isinstance(inc, str):
+				try:
+					self._includes.append(str(int(inc)))
+				except ValueError:
+					raise ValueError("The WordPress ID (an integer, '{0}' given) must be provided to limit result to specific users.".format(inc))
+
+	@property
+	def offset(self):
+		return self._offset
+		
+	@offset.setter
+	def offset(self, value):
+		'''
+		Set value to offset the result set by the specified number of items.
+		'''
+		if value is None:
+			self.parameters.pop("offset", None)
+			self._offset = None
+		elif isinstance(value, int):
+			self._offset = value
+		elif isinstance(value, str):
+			try:
+				self._offset = str(int(str))
+			except ValueError:
+				raise ValueError("The 'offset' value should be an integer, was given: '{0}'.".format(value))
+
+	@property
+	def order(self):
+		return self._order;
+		#return self.api_params.get('order', None)
+		
+	@order.setter
+	def order(self, value):
+		if value is None:
+			self.parameters.pop("order", None)
+			self._order = None
+		else:
+			order_values = ['asc', 'desc']
+			if isinstance(value, str):
+				value = value.lower()
+				if value not in order_values:
+					raise ValueError('The "order" parameter must be one '+\
+									 'of these values: {}'.format(order_values))
+				else:
+					#self.api_params['order'] = value
+					self._order = value
+			else:
+				raise ValueError('The "order" parameter must be one of '+\
+								 'these values: {} (or None).'.format(order_values))
+		return self._order
+
+	@property
+	def orderby(self):
+		return self.api_params.get('orderby', None)
+		
+	@orderby.setter
+	def orderby(self, value):
+		if value is None:
+			self.parameters.pop("orderby", None)
+			self._orderby = None
+		else:
+			order_values = ['asc', 'desc']
+			if isinstance(value, str):
+				value = value.lower()
+				if value not in orderby_values:
+					raise ValueError('The "orderby" parameter must be one '+\
+									 'of these values: {}'.format(orderby_values))
+				else:
+					#self.api_params['orderby'] = value
+					self._orderby = value
+			else:
+				raise ValueError('The "orderby" parameter must be one of these '+\
+								 'values: {} (or None).'.format(orderby_values))
+		return self._orderby
+
+	@property
+	def slug(self):
+		return self._slugs
+	
+	@slug.setter
+	def slug(self, value):
+		if value is None:
+			self._slugs = list()
+		elif isinstance(value, str):
+			self._slugs.append(value)
+		elif isinstance(value, list):
+			# validate data type
+			for v in value:
+				if not isinstance(v, str):
+					raise ValueError("slugs must be string type; found '{0}'".format(type(v)))
+			self._slugs = value
+
+	@property
+	def roles(self):
+		'''
+		User roles to be used in query.
+		'''
+		return self._roles
+		
+	@roles.setter
+	def roles(self, values):
+		if values is None:
+			self._parameters.pop("roles", None)
+			self._roles = list()
+			return
+		elif not isinstance(values, list):
+			raise ValueError("Roles must be provided as a list (or append to the existing list).")
+		
+		for role in values:
+			if isinstance(s.str):
+				self.roles.append(role)
+			else:
+				raise ValueError("Unexpected type for property list 'roles'; expected str, got '{0}'".format(type(s)))
 			
 
 
