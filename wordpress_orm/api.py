@@ -35,7 +35,7 @@ class API:
 
 	'''
 	def __init__(self, url=None):
-		self.base_url = url
+		self._base_url = url
 		self.session = None
 		
 		# A valid "requests" authentication handler,
@@ -79,6 +79,17 @@ class API:
 			return self.authenticator
 		else:
 			raise Exception("Unknown or unsupported authentication method.")
+
+	@property
+	def base_url(self):
+		return self._base_url
+	
+	@base_url.setter
+	def base_url(self, url):
+		if not url[-1] == "/":
+			url = url + "/"
+		self._base_url = url
+	
 
 	def PostRequest(self, **kwargs):
 		''' Factory method that returns a new PostRequest attached to this API. '''
