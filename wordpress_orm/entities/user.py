@@ -9,6 +9,7 @@ import requests
 
 from .wordpress_entity import WPEntity, WPRequest, context_values
 from ..cache import WPORMCacheObjectNotFoundError
+from ..exc import AuthenticationRequired
 
 logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
 
@@ -177,10 +178,18 @@ class UserRequest(WPRequest):
 			logger.debug("URL='{}'".format(self.request.url))
 		except requests.exceptions.HTTPError:
 			logger.debug("User response code: {}".format(self.response.status_code))
-			if self.response.status_code == 404:
-				return None
-			elif self.response.status_code == 404:
-				return None
+			if 400 < self.response.status_code < 499:
+				if self.response.status_code in [401, 403]: # 401 = Unauthorized, 403 = Forbidden
+					data = self.response.json()
+					if data["code"] == 'rest_user_cannot_view':
+						# TODO: write more detailed message and propose solution
+						raise AuthenticationRequired("WordPress authentication is required for this operation. Response: {0}".format(data))
+					raise AuthenticationRequired("WordPress authentication is required for this operation. Response: {0}".format(data))
+#				elif self.response.status_code == 404:
+#					return None
+				raise Exception("Unhandled HTTP response code ({0}).".format(self.response.status_code))
+			else:
+				raise Exception("Unhandled HTTP response code ({0}).".format(self.response.status_code))
 
 		users_data = self.response.json()
 		
@@ -193,6 +202,7 @@ class UserRequest(WPRequest):
 
 			# Before we continue, do we have this User in the cache already?
 			try:
+				print(d)
 				user = self.api.wordpress_object_cache.get(class_name=User.__name__, key=d["id"])
 				users.append(user)
 				continue
