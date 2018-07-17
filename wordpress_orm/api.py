@@ -178,7 +178,7 @@ class API:
 		else:
 			# more than one found
 			logger.debug(media_list)
-			assert False, "More than one media item found. (parameters: id={0} slug={1}) Should not get here! Items found: {3}".format(id, slug, media_list)
+			assert False, "More than one media item found. (parameters: id={0} slug={1}) Should not get here! Items found: {2}".format(id, slug, media_list)
 
 	def user(self, id=None, username=None, slug=None):
 		'''
