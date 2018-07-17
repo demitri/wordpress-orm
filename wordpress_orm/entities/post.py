@@ -54,17 +54,13 @@ class Post(WPEntity):
 		Returns the 'Media' object that is the "featured media" for this post.
 		'''
 		if self._featured_media is None:
-		
-			found_media = self.api.media(id=self.s.featured_media)
-			self._featured_media = found_media
-		
-#			mr = self.api.MediaRequest()
-#			mr.id = self.s.featured_media
-#			media_list = mr.get()
-#			if len(media_list) == 1:
-#				self._featured_media = media_list[0]
-#			else:
-#				self._featured_media = None
+			
+			media_id = self.s.featured_media
+			if media_id == 0:
+				# no featured media for this post entry (this is what WordPress returns)
+				self._featured_media = None
+			else:
+				self._featured_media = self.api.media(id=media_id)
 		return self._featured_media
 			
 	@property
