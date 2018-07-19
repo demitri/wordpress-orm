@@ -102,7 +102,7 @@ class API:
 		id : WordPress ID
 		'''
 		if len([x for x in [id, slug] if x is not None]) > 1:
-			raise Exception("Only one of [id, slug] can be specified at a time.")
+			raise Exception("Only one of [id, slug] can be specified at a time (both were specified).")
 		if not any([id, slug]):
 			# none in list are defined
 			raise Exception("At least one of 'id' or 'slug' must be specified.")
@@ -146,10 +146,11 @@ class API:
 		id : WordPress ID
 		'''
 		if len([x for x in [id, slug] if x is not None]) > 1:
-			raise Exception("Only one of [id, slug] can be specified at a time.")
+			raise Exception("Only one of [id, slug] can be specified at a time (both were specified).")
 		elif id is None and slug is None:
-			# be careful of id=0 case
 			raise Exception("At least one of 'id' or 'slug' must be specified.")
+		elif id == 0:
+			return None
 
 		# check cache first
 		try:

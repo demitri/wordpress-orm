@@ -22,3 +22,8 @@ class AuthenticationRequired(WordPressORMException):
 class UserNotFound(WordPressORMException):
 	''' WordPress user not found. '''
 	pass
+
+class MissingRequiredParameter(WordPressORMException):
+	''' A required parameter was missing. '''
+	pass
+

@@ -9,7 +9,7 @@ import requests
 
 from .wordpress_entity import WPEntity, WPRequest, context_values
 from ..cache import WPORMCacheObjectNotFoundError
-from ..exc import AuthenticationRequired
+from ..exc import AuthenticationRequired, MissingRequiredParameter
 
 logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
 
@@ -32,6 +32,34 @@ class User(WPEntity):
 				   "description", "link", "locale", "nickname", "slug", "registered_date",
 				   "roles", "password", "capabilities", "extra_capabilities", "avatar_urls", "meta"]
 		return self._schema_fields
+
+	def commit(self):
+		'''
+		Creates a new user or updates an existing user via the API.
+		'''
+		# is this a new user?
+		new_user = (self.s.id is None)
+		
+		post_fields = ["username", "name", "first_name", "last_name", "email", "url",
+					   "description", "locale", "nickname", "slug", "roles", "password", "meta"]
+		if new_user:
+			post_fields.append("id")
+		
+		parameters = dict()
+		for field in post_fields:
+			if getattr(self.s, field) is not None:
+				parameters[field] = getattr(self.s, field)
+		
+		# new user validation
+		if new_user:
+			required_fields = ["username", "email", "password"]
+			for field in required_fields:
+				if getattr(self.s, field) is None:
+					raise MissingRequiredParameter("The '{0}' field must be provided when creating a new user.".format(field))
+		
+		response = self.api.session.post(url=self.url, params=parameters, auth=self.api.auth())
+				
+		return response
 
 	@property
 	def posts(self):
