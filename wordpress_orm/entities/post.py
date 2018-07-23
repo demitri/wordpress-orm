@@ -1,6 +1,5 @@
                                                                                                                                                                                                                                                                                                                                                                                                                                                        
 '''
-
 WordPress API reference: https://developer.wordpress.org/rest-api/reference/posts/
 '''
 
@@ -161,7 +160,7 @@ class PostRequest(WPRequest):
 		'''
 		Returns a list of 'Post' objects that match the parameters set in this object.
 		
-		count : Boolean, if True, only returns the number of object found.
+		count : Boolean, if True, only returns the number of objects found.
 		
 		'''
 		self.url = self.api.base_url + "posts"
