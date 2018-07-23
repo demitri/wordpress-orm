@@ -177,8 +177,7 @@ class MediaRequest(WPRequest):
 			logger.debug("HTTP error! media response code: {}".format(self.response.status_code))
 			if self.response.status_code == 404:
 				return None
-			elif self.response.status_code == 404:
-				return None
+			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
 
 		media_data = self.response.json()
 

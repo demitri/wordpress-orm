@@ -137,7 +137,8 @@ class TagRequest(WPRequest):
 				raise exc.BadRequest("400: Bad request. Error: \n{0}".format(json.dumps(self.response.json(), indent=4)))
 			elif self.response.status_code == 404: # not found
 				return None
-
+			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
+			
 		# read response headers
 		self.total = self.response.headers['X-WP-Total']
 		self.total_pages = self.response.headers['X-WP-TotalPages']

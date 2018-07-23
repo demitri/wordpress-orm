@@ -4,7 +4,13 @@ class WPORMCacheObjectNotFoundError(Exception):
 
 class WPORMCache:
 	def __init__(self):
-		self.cache = dict()
+		self.initialize()
+
+	def initialize(self):
+		'''
+		Internal method to set up the cache from scratch.
+		'''
+		self.cache = dict()	
 
 	def get(self, class_name=None, key=None):
 		'''
@@ -29,3 +35,8 @@ class WPORMCache:
 			self.cache[class_name] = dict()
 		self.cache[class_name][key] = value
 
+	def clear(self):
+		'''
+		Clear all items from the cache.
+		'''
+		self.initialize_cacheinitialize()

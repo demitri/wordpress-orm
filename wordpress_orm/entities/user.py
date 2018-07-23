@@ -215,9 +215,7 @@ class UserRequest(WPRequest):
 					raise AuthenticationRequired("WordPress authentication is required for this operation. Response: {0}".format(data))
 #				elif self.response.status_code == 404:
 #					return None
-				raise Exception("Unhandled HTTP response code ({0}).".format(self.response.status_code))
-			else:
-				raise Exception("Unhandled HTTP response code ({0}).".format(self.response.status_code))
+			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
 
 		users_data = self.response.json()
 		

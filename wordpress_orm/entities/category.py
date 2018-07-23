@@ -135,6 +135,10 @@ class CategoryRequest(WPRequest):
 				raise exc.BadRequest("400: Bad request. Error: \n{0}".format(json.dumps(self.response.json(), indent=4)))
 			elif self.response.status_code == 404: # not found
 				return None
+			elif self.response.status_code == 500: # 
+				raise Exception("500: Internal Server Error. Error: \n{0}".format(self.response.json()))
+			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
+
 				
 		categories_data = self.response.json()
 		
@@ -147,6 +151,7 @@ class CategoryRequest(WPRequest):
 			
 			# Before we continue, do we have this Category in the cache already?
 			try:
+				logger.debug(d)
 				category = self.api.wordpress_object_cache.get(Category.__name__, key=d["id"])
 				categories.append(category)
 				continue
