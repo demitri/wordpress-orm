@@ -39,4 +39,4 @@ class WPORMCache:
 		'''
 		Clear all items from the cache.
 		'''
-		self.initialize_cacheinitialize()
+		self.initialize()
