@@ -15,6 +15,7 @@ class WPORMCache:
 	def get(self, class_name=None, key=None):
 		'''
 		Method to retrieve wordpress-orm entity from cache; key can be WordPress 'id' or slug.
+		Keys that are not strings are coerced to type 'str' (i.e. an id of 4 or "4" is equivalent).
 		'''
 		if key is not None and isinstance(key, str) is False:
 			key = str(key)
@@ -25,15 +26,20 @@ class WPORMCache:
 		except KeyError:
 			raise WPORMCacheObjectNotFoundError("Object of class '{0}' with key='{1}' not found".format(class_name, key))
 	
-	def set(self, class_name=None, key=None, value=None):
+	def set(self, value=None, keys=list()):
 		'''
-		Method to set values in the cache.
+		Method to set values in the cache. Typically keys is a tuple or list containing the WordPress id and slug.
+		Keys that are not strings are coerced to type 'str' (i.e. an id of 4 or "4" is equivalent).
 		'''
-		if key is not None and isinstance(key, str) is False:
-			key = str(key)
+#		if key is not None and isinstance(key, str) is False:
+#			key = str(key)
+		class_name = type(value).__name__
 		if class_name not in self.cache:
 			self.cache[class_name] = dict()
-		self.cache[class_name][key] = value
+		for key in [k for k in keys if k is not None]: # safeguard against any key value that might be None
+			if isinstance(key, str) is False:
+				key = str(key)
+			self.cache[class_name][key] = value
 
 	def clear(self):
 		'''

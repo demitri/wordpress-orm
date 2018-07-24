@@ -199,41 +199,42 @@ class MediaRequest(WPRequest):
 			media = Media(api=self.api)
 			media.json = d
 			
-			# Properties applicable to 'view', 'edit', 'embed' query contexts
-			#
-			#logger.debug(d)
-			media.s.date = d["date"]
-			media.s.id = d["id"]
-			media.s.link = d["link"]
-			media.s.slug = d["slug"]
-			media.s.type = d["type"]
-			media.s.title = d["title"]
-			media.s.author = d["author"]
-			media.s.alt_text = d["alt_text"]
-			media.s.caption = d["caption"]["rendered"]
-			media.s.media_type = d["media_type"]
-			media.s.mime_type = d["mime_type"]
-			media.s.media_details = d["media_details"]
-			media.s.source_url = d["source_url"]
-
-			# Properties applicable only to 'view', 'edit' query contexts
-			#
-			if request_context in ["view", "edit"]:
-				media.s.date_gmt = d["date_gmt"]
-				media.s.guid = d["guid"]
-				media.s.modified = d["modified"]
-				media.s.modified_gmt = d["modified_gmt"]
-				media.s.status = d["status"]
-				media.s.comment_status = d["comment_status"]
-				media.s.ping_status = d["ping_status"]
-				media.s.meta = d["meta"]
-				media.s.template = d["template"]
-				media.s.description = d["description"]["rendered"]
-				media.s.post = d["post"]
+			media.update_schema_from_dictionary(d)
+			
+# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
+# 			#
+# 			#logger.debug(d)
+# 			media.s.date = d["date"]
+# 			media.s.id = d["id"]
+# 			media.s.link = d["link"]
+# 			media.s.slug = d["slug"]
+# 			media.s.type = d["type"]
+# 			media.s.title = d["title"]
+# 			media.s.author = d["author"]
+# 			media.s.alt_text = d["alt_text"]
+# 			media.s.caption = d["caption"]["rendered"]
+# 			media.s.media_type = d["media_type"]
+# 			media.s.mime_type = d["mime_type"]
+# 			media.s.media_details = d["media_details"]
+# 			media.s.source_url = d["source_url"]
+# 
+# 			# Properties applicable only to 'view', 'edit' query contexts
+# 			#
+# 			if request_context in ["view", "edit"]:
+# 				media.s.date_gmt = d["date_gmt"]
+# 				media.s.guid = d["guid"]
+# 				media.s.modified = d["modified"]
+# 				media.s.modified_gmt = d["modified_gmt"]
+# 				media.s.status = d["status"]
+# 				media.s.comment_status = d["comment_status"]
+# 				media.s.ping_status = d["ping_status"]
+# 				media.s.meta = d["meta"]
+# 				media.s.template = d["template"]
+# 				media.s.description = d["description"]["rendered"]
+# 				media.s.post = d["post"]
 				
 			# add to cache
-			self.api.wordpress_object_cache.set(class_name=Media.__name__, key=media.s.id, value=media)
-			self.api.wordpress_object_cache.set(class_name=Media.__name__, key=media.s.slug, value=media)
+			self.api.wordpress_object_cache.set(value=media, keys=(media.s.id, media.s.slug))
 				
 			media_objects.append(media)
 		

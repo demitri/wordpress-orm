@@ -1,7 +1,11 @@
 
+import inspect
+import logging
 from abc import ABCMeta, abstractmethod, abstractproperty
 
 import requests
+
+logger = logging.getLogger(__name__.split(".")[0]) # use package name
 
 context_values = ["view", "embed", "edit"]
 
@@ -53,7 +57,36 @@ class WPEntity(metaclass=ABCMeta):
 		Hook to allow custom subclasses to process responses.
 		Usually will access self.json to get the full JSON record that created this entity.
 		'''
-		pass	
+		pass
+		
+	def update_schema_from_dictionary(self, d, process_links=False):
+		'''
+		Replaces schema values with those found in provided dictionary whose keys match the field names.
+		
+		This is useful to parse the JSON dictionary returned by the WordPress API or embedded content
+		(see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding).
+		
+		d : dictionary of data, key=schema field, value=data
+		process_links : parse the values under the "_links" key, if present
+		'''
+		if d is None or not isinstance(d, dict):
+			raise ValueError("The method 'update_schema_from_dictionary' expects a dictionary.")
+		
+		fields = self.schema_fields
+		
+		for key in fields:
+			if key in d:
+				if isinstance(d[key], dict) and "rendered" in d[key]:
+					# for some fields, we want the "rendered" value - any cases where we don't??
+					setattr(self.s, key, d[key]["rendered"])
+				else:
+					setattr(self.s, key, d[key])
+			if key not in fields:
+				logger.debug("WARNING: encountered field ('{0}') in dictionary that is not in the list of schema fields for '{1}' (fields: {2}).".format(key, self.__class__.__name__, fields))
+		
+		if process_links:
+			# TODO: handle _links if present
+			raise NotImplementedError("Processing '_links' has not yet been implemented.")
 
 class WPRequest(metaclass=ABCMeta):
 	'''
@@ -62,7 +95,7 @@ class WPRequest(metaclass=ABCMeta):
 	def __init__(self, api=None):
 		
 		if api is None:
-			raise Exception("Create this object ('{}') from the API object, not directly.".format(self.__class__.__name__))
+			raise Exception("Create this object ('{0}') from the API object, not directly.".format(self.__class__.__name__))
 		
 		self.api = api
 		self.parameters = dict()
@@ -90,7 +123,7 @@ class WPRequest(metaclass=ABCMeta):
 	def get_response(self):
 		if self.response is None:
 			if self.api.session is None:
-				print("creating new request")
+				#logger.debug("creating new request")
 				# no exiting request, create a new one
 				self.response = requests.get(url=self.url, params=self.parameters, auth=self.api.auth())
 			else:

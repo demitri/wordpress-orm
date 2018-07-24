@@ -22,7 +22,7 @@ class Category(WPEntity):
 	
 	def __init__(self, id=None, session=None, api=None):
 		super().__init__(api=api)
-	
+		
 		# cache related objects
 		self._posts = None
 		
@@ -31,8 +31,7 @@ class Category(WPEntity):
 	
 	@property
 	def schema_fields(self):
-		return ["id", "count", "description", "link",
-				"name", "slug", "taxonomy", "parent", "meta"]
+		return ["id", "count", "description", "link", "name", "slug", "taxonomy", "parent", "meta"]
 	
 	# Pass-through properties
 	# -----------------------
@@ -161,25 +160,26 @@ class CategoryRequest(WPRequest):
 			category = Category(api=self.api)
 			category.json = json.dumps(d)
 			
-			# Properties applicable to 'view', 'edit', 'embed' query contexts
-			#
-			category.s.id = d["id"]
-			category.s.link = d["link"]
-			category.s.name = d["name"]
-			category.s.slug = d["slug"]
-			category.s.taxonomy = d["taxonomy"]
-			
-			# Properties applicable to only 'view', 'edit' query contexts:
-			#
-			if request_context in ["view", "edit"]:
-				category.s.count = d["count"]
-				category.s.description = d["description"]
-				category.s.parent = d["parent"]
-				category.s.meta = d["meta"]
+			category.update_schema_from_dictionary(d)
+
+# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
+# 			#
+# 			category.s.id = d["id"]
+# 			category.s.link = d["link"]
+# 			category.s.name = d["name"]
+# 			category.s.slug = d["slug"]
+# 			category.s.taxonomy = d["taxonomy"]
+# 			
+# 			# Properties applicable to only 'view', 'edit' query contexts:
+# 			#
+# 			if request_context in ["view", "edit"]:
+# 				category.s.count = d["count"]
+# 				category.s.description = d["description"]
+# 				category.s.parent = d["parent"]
+# 				category.s.meta = d["meta"]
 			
 			# add to cache
-			self.api.wordpress_object_cache.set(class_name=Category.__name__, key=category.s.id, value=category)
-			self.api.wordpress_object_cache.set(class_name=Category.__name__, key=category.s.slug, value=category)
+			self.api.wordpress_object_cache.set(value=category, keys=(category.s.id, category.s.slug))
 
 			categories.append(category)
 		

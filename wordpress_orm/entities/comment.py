@@ -140,38 +140,39 @@ class CommentRequest(WPRequest):
 			comment = Comment(api=self.api)
 			comment.json = json.dumps(d)
 			
-			# Properties applicable to 'view', 'edit', 'embed' query contexts
-			#
-			comment.s.id = d["id"]
-			comment.s.author = d["author"]
-			comment.s.author_name = d["author_name"]
-			comment.s.author_url = d["author_url"]
-			comment.s.content = d["content"]["rendered"]
-			comment.s.date = d["date"]
-			comment.s.link = d["link"]
-			comment.s.parent = d["parent"]
-			comment.s.type = d["type"]
-			comment.s.author_avatar_urls = d["author_avatar_urls"]
-
-			# Properties applicable to only 'view', 'edit' query contexts:
-			#
-			if request_context in ["view", "edit"]:
-				comment.s.date_gmt = d["date_gmt"]
-				comment.s.post = d["post"]
-				comment.s.status = d["status"]
-				comment.s.meta = d["meta"]
+			comment.update_schema_from_dictionary(d)
 			
-			
-			# Properties applicable to only 'edit' query contexts:
-			#
-			if request_context in ["edit"]:
-				comment.s.author_email = d["author_email"]
-				comment.s.author_ip = d["author_ip"]
-				comment.s.author_user_agent = d["author_user_agent"]
+# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
+# 			#
+# 			comment.s.id = d["id"]
+# 			comment.s.author = d["author"]
+# 			comment.s.author_name = d["author_name"]
+# 			comment.s.author_url = d["author_url"]
+# 			comment.s.content = d["content"]["rendered"]
+# 			comment.s.date = d["date"]
+# 			comment.s.link = d["link"]
+# 			comment.s.parent = d["parent"]
+# 			comment.s.type = d["type"]
+# 			comment.s.author_avatar_urls = d["author_avatar_urls"]
+# 
+# 			# Properties applicable to only 'view', 'edit' query contexts:
+# 			#
+# 			if request_context in ["view", "edit"]:
+# 				comment.s.date_gmt = d["date_gmt"]
+# 				comment.s.post = d["post"]
+# 				comment.s.status = d["status"]
+# 				comment.s.meta = d["meta"]
+# 			
+# 			
+# 			# Properties applicable to only 'edit' query contexts:
+# 			#
+# 			if request_context in ["edit"]:
+# 				comment.s.author_email = d["author_email"]
+# 				comment.s.author_ip = d["author_ip"]
+# 				comment.s.author_user_agent = d["author_user_agent"]
 
 			# add to cache
-			self.api.wordpress_object_cache.set(class_name=Comment.__name__, key=comment.s.id, value=comment)
-			self.api.wordpress_object_cache.set(class_name=Comment.__name__, key=comment.s.slug, value=comment)
+			self.api.wordpress_object_cache.set(value=comment, keys=(comment.s.id, comment.s.slug))
 
 			comments.append(comment)
 		

@@ -166,28 +166,29 @@ class TagRequest(WPRequest):
 			tag = Tag(api=self.api)
 			tag.json = json.dumps(d)
 
+			tag.update_schema_from_dictionary(d)
+
 			# Properties applicable to 'view', 'edit', 'embed' query contexts
 			#
-			tag.s.id = d["id"]
-			tag.s.link = d["link"]
-			tag.s.slug = d["slug"]
-			tag.s.taxonomy = d["taxonomy"]
+# 			tag.s.id = d["id"]
+# 			tag.s.link = d["link"]
+# 			tag.s.slug = d["slug"]
+# 			tag.s.taxonomy = d["taxonomy"]
 
 			# Properties applicable to only 'view', 'edit' query contexts:
 			#
-			if request_context in ["view", "edit"]:
-#				view_edit_properties = ["date_gmt", "guid", "modified", "modified_gmt", "status",
-#										"content", "comment_status", "ping_status", "format", "meta",
-#										"sticky", "template", "categories", "tags"]
-#				for key in view_edit_properties:
-#					setattr(page.s, key, d[key])
-				tag.s.count = d["count"]
-				tag.s.description = d["description"]
-				tag.s.meta = d["meta"]
+# 			if request_context in ["view", "edit"]:
+# #				view_edit_properties = ["date_gmt", "guid", "modified", "modified_gmt", "status",
+# #										"content", "comment_status", "ping_status", "format", "meta",
+# #										"sticky", "template", "categories", "tags"]
+# #				for key in view_edit_properties:
+# #					setattr(page.s, key, d[key])
+# 				tag.s.count = d["count"]
+# 				tag.s.description = d["description"]
+# 				tag.s.meta = d["meta"]
 
 			# add to cache
-			self.api.wordpress_object_cache.set(class_name=Tag.__name__, key=tag.s.id, value=tag)
-			self.api.wordpress_object_cache.set(class_name=Tag.__name__, key=tag.s.slug, value=tag)
+			self.api.wordpress_object_cache.set(value=tag, keys=(tag.s.id, tag.s.slug))
 
 			tags.append(tag)
 

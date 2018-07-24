@@ -33,23 +33,23 @@ class User(WPEntity):
 				   "roles", "password", "capabilities", "extra_capabilities", "avatar_urls", "meta"]
 		return self._schema_fields
 
-	def populate_from_dictionary(self, d):
-		'''
-		Populate this user's schema from the provided dictionary.
-		
-		This is useful to parse the JSON dictionary returned by the WordPress API or embedded content
-		(see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding).
-		'''
-		if d is None or not isinstance(d, dict):
-			raise ValueError("The method 'populate_from_dictionary' expects a dictionary.")
-		
-		for key in ["id", "name", "url", "description", "link", "slug", "avatar_urls", "meta",
-					"username", "first_name", "last_name", "email", "locale", "nickname",
-					"registered_date", "roles", "capabilities", "extra_capabilities"]:
-			if key in d:
-				setattr(self.s, key, d[key])
-		if d["id"]:
-			self.u.id = d["id"]
+# 	def populate_from_dictionary(self, d):
+# 		'''
+# 		Populate this user's schema from the provided dictionary.
+# 		
+# 		This is useful to parse the JSON dictionary returned by the WordPress API or embedded content
+# 		(see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding).
+# 		'''
+# 		if d is None or not isinstance(d, dict):
+# 			raise ValueError("The method 'populate_from_dictionary' expects a dictionary.")
+# 		
+# 		for key in ["id", "name", "url", "description", "link", "slug", "avatar_urls", "meta",
+# 					"username", "first_name", "last_name", "email", "locale", "nickname",
+# 					"registered_date", "roles", "capabilities", "extra_capabilities"]:
+# 			if key in d:
+# 				setattr(self.s, key, d[key])
+# 		if d["id"]:
+# 			self.u.id = d["id"]
 
 
 	def commit(self):
@@ -247,7 +247,6 @@ class UserRequest(WPRequest):
 
 			# Before we continue, do we have this User in the cache already?
 			try:
-				print(d)
 				user = self.api.wordpress_object_cache.get(class_name=User.__name__, key=d["id"])
 				users.append(user)
 				continue
@@ -262,40 +261,43 @@ class UserRequest(WPRequest):
 			#
 			#   "id", "name", "url", "description", "link", "slug", "avatar_urls"
 			#
-			user.s.id = d["id"]
-			user.s.name = d["name"]
-			user.s.url = d["url"]
-			user.s.description = d["description"]
-			user.s.link = d["link"]
-			user.s.slug = d["slug"]
-			user.s.avatar_urls = d["avatar_urls"]
-
-			# Properties applicable to only 'view', 'edit' query contexts:
-			#
-			if request_context in ["view", "edit"]:
-				user.meta = d["meta"]
+# 			user.s.id = d["id"]
+# 			user.s.name = d["name"]
+# 			user.s.url = d["url"]
+# 			user.s.description = d["description"]
+# 			user.s.link = d["link"]
+# 			user.s.slug = d["slug"]
+# 			user.s.avatar_urls = d["avatar_urls"]
+# 
+# 			# Properties applicable to only 'view', 'edit' query contexts:
+# 			#
+# 			if request_context in ["view", "edit"]:
+# 				user.meta = d["meta"]
+# 			
+# 			# Properties applicable to only 'edit' query contexts
+# 			#
+# 			if request_context in ["edit"]:
+# 				user.s.username = d["username"]
+# 				user.s.first_name = d["first_name"]
+# 				user.s.last_name = d["last_name"]
+# 				user.s.email = d["email"]
+# 				user.s.locale = d["locale"]
+# 				user.s.nickname = d["nickname"]
+# 				user.s.registered_date = d["registered_date"]
+# 				user.s.roles = d["roles"]
+# 				user.s.capabilities = d["capabilities"]
+# 				user.s.extra_capabilities = d["extra_capabilities"]
 			
-			# Properties applicable to only 'edit' query contexts
-			#
-			if request_context in ["edit"]:
-				user.s.username = d["username"]
-				user.s.first_name = d["first_name"]
-				user.s.last_name = d["last_name"]
-				user.s.email = d["email"]
-				user.s.locale = d["locale"]
-				user.s.nickname = d["nickname"]
-				user.s.registered_date = d["registered_date"]
-				user.s.roles = d["roles"]
-				user.s.capabilities = d["capabilities"]
-				user.s.extra_capabilities = d["extra_capabilities"]
+			user.update_schema_from_dictionary(d)
+			
+			#logger.debug("User response keys: {}".format(d.keys()))
 			
 			# allow subclasses to process single entity
-			#print("json: {0}".format(user.json))
+			#logger.debug("json: {0}".format(user.json))
 			user.postprocess_response()
 			
 			# add to cache
-			self.api.wordpress_object_cache.set(class_name=User.__name__, key=str(user.s.id), value=user)
-			self.api.wordpress_object_cache.set(class_name=User.__name__, key=user.s.slug, value=user)
+			self.api.wordpress_object_cache.set(value=user, keys=(user.s.id, user.s.slug))
 
 			users.append(user)
 
