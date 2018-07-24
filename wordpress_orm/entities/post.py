@@ -156,12 +156,12 @@ class PostRequest(WPRequest):
 				"order", "orderby", "slug", "status", "categories",
 				"categories_exclude", "tags", "tags_exclude", "sticky"]
 
-	def get(self, count=False):
+	def get(self, count=False, embed=True):
 		'''
 		Returns a list of 'Post' objects that match the parameters set in this object.
 		
 		count : Boolean, if True, only returns the number of objects found.
-		
+		embed : include full content of linked resources in the response instead of just the ID, see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
 		'''
 		self.url = self.api.base_url + "posts"
 		
@@ -171,6 +171,9 @@ class PostRequest(WPRequest):
 		# -------------------
 		# populate parameters
 		# -------------------
+		if embed is True:
+			self.parameters["_embed"] = "true"
+
 		if self.context:
 			self.parameters["context"] = self.context
 			request_context = self.context
@@ -201,8 +204,10 @@ class PostRequest(WPRequest):
 			self.parameters["author_exclude"] = ",".join(self.author_exclude)
 			
 		# before : Limit response to posts published before a given ISO8601 compliant date.
+		# TODO
 		
 		# exclude : Ensure result set excludes specific IDs.
+		# TODO
 		
 		# include : Limit result set to specific IDs.
 		if len(self.include) > 0:
@@ -216,7 +221,8 @@ class PostRequest(WPRequest):
 		if self.order:
 			self.parameters["order"] = self.order
 
-		# orderby : Sort collection by object attribute, default "date", One of: author, date, id, include, modified, parent, relevance, slug, title
+		# orderby : Sort collection by object attribute, default "date"
+		# one of: author, date, id, include, modified, parent, relevance, slug, title
 		if self.orderby:
 			self.parameters["orderby"] = self.orderby
 
@@ -225,7 +231,6 @@ class PostRequest(WPRequest):
 			self.parameters["slug"] = self.slug
 			
 		# status : Limit result set to posts assigned one or more statuses. (default: publish)
-
 		if len(self.status) > 0:
 			self.parameters["status"] = ",".join(self.status)
 
@@ -341,6 +346,13 @@ class PostRequest(WPRequest):
 				logger.debug(d["title"])
 				logger.debug(request_context)
 				raise NotImplementedError
+		
+			# Check for embedded content
+			if embed is True:
+				print(json.dumps(d["_embedded"]))
+				embedded = d["_embedded"] # dictionary
+				logger.info(embedded)
+				logger.info(embedded["author"])
 		
 			# add to cache
 			self.api.wordpress_object_cache.set(class_name=Post.__name__, key=post.s.id, value=post)

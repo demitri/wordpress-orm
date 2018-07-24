@@ -15,14 +15,14 @@ logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package
 
 class User(WPEntity):
 	
-	def __init__(self, id=None, session=None, api=None):
+	def __init__(self, id=None, session=None, api=None, from_dictionary=None):
 		super().__init__(api=api)
 		
 		# parameters that undergo validation, i.e. need custom setter
 		self._context = None
 
 		# cache related objects
-		self._posts = None
+		self._posts = None			
 		
 	@property
 	def schema_fields(self):
@@ -32,6 +32,25 @@ class User(WPEntity):
 				   "description", "link", "locale", "nickname", "slug", "registered_date",
 				   "roles", "password", "capabilities", "extra_capabilities", "avatar_urls", "meta"]
 		return self._schema_fields
+
+	def populate_from_dictionary(self, d):
+		'''
+		Populate this user's schema from the provided dictionary.
+		
+		This is useful to parse the JSON dictionary returned by the WordPress API or embedded content
+		(see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding).
+		'''
+		if d is None or not isinstance(d, dict):
+			raise ValueError("The method 'populate_from_dictionary' expects a dictionary.")
+		
+		for key in ["id", "name", "url", "description", "link", "slug", "avatar_urls", "meta",
+					"username", "first_name", "last_name", "email", "locale", "nickname",
+					"registered_date", "roles", "capabilities", "extra_capabilities"]:
+			if key in d:
+				setattr(self.s, key, d[key])
+		if d["id"]:
+			self.u.id = d["id"]
+
 
 	def commit(self):
 		'''

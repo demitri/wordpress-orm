@@ -95,11 +95,12 @@ class API:
 		''' Factory method that returns a new PostRequest attached to this API. '''
 		return post.PostRequest(api=kwargs.pop('api', self), **kwargs)
 
-	def post(self, id=None, slug=None):
+	def post(self, id=None, slug=None, embed=True):
 		'''
 		Returns a Post object from the WordPress API with the provided ID.
 
 		id : WordPress ID
+		embed : retrieve full content of related entities instead of the WordPress ID, see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
 		'''
 		if len([x for x in [id, slug] if x is not None]) > 1:
 			raise Exception("Only one of [id, slug] can be specified at a time (both were specified).")
@@ -125,7 +126,7 @@ class API:
 		if slug:
 			pr.slug = slug
 
-		posts = pr.get()
+		posts = pr.get(embed=embed)
 
 		if len(posts) == 1:
 			return posts[0]
