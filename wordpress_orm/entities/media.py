@@ -5,6 +5,7 @@ WordPress API reference: https://developer.wordpress.org/rest-api/reference/medi
 '''
 
 import os
+import json
 import logging
 
 import requests
@@ -193,24 +194,20 @@ class MediaRequest(WPRequest):
 			# Before we continue, do we have this Media in the cache already?
 			try:
 				media = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
-				media_objects.append(media)
-				continue
 			except WPORMCacheObjectNotFoundError:
-				pass
-
-			media = classobject.__new__(classobject)
-			media.__init__(api=self.api)
-			media.json = json.dumps(d)
-			
-			media.update_schema_from_dictionary(d)
-			
-			if "_embedded" in d:
-				logger.debug("TODO: implement _embedded content for Media object")
-
-			media.postprocess_response(data=d)
-
-			# add to cache
-			self.api.wordpress_object_cache.set(value=media, keys=(media.s.id, media.s.slug))
+				media = classobject.__new__(classobject)
+				media.__init__(api=self.api)
+				media.json = json.dumps(d)
+				
+				media.update_schema_from_dictionary(d)
+				
+				if "_embedded" in d:
+					logger.debug("TODO: implement _embedded content for Media object")
+	
+				media.postprocess_response(data=d)
+	
+				# add to cache
+				self.api.wordpress_object_cache.set(value=media, keys=(media.s.id, media.s.slug))
 				
 			media_objects.append(media)
 		
