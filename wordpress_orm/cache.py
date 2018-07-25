@@ -16,6 +16,8 @@ class WPORMCache:
 		'''
 		Method to retrieve wordpress-orm entity from cache; key can be WordPress 'id' or slug.
 		Keys that are not strings are coerced to type 'str' (i.e. an id of 4 or "4" is equivalent).
+		
+		class_name : class name as string
 		'''
 		if key is not None and isinstance(key, str) is False:
 			key = str(key)

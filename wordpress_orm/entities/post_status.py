@@ -103,4 +103,8 @@ class PostStatusRequest(WPRequest):
 			post_status = PostStatus(api=self.api)
 			post_status.json = json.dumps(d)
 			
+			post_status.postprocess_response()
+			
+			raise NotImplementedError("Not yet finished.")
+
 				

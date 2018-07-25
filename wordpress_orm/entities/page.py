@@ -118,7 +118,7 @@ class PageRequest(WPRequest):
 				"author_exclude", "before", "exclude", "include", "menu_order", "offset",
 				"order", "orderby", "parent", "parent_exclude", "slug", "status"]
 
-	def get(self, count=False):
+	def get(self, classname=Page, count=False):
 		'''
 		Returns a list of 'Page' objects that match the parameters set in this object.
 
@@ -208,13 +208,14 @@ class PageRequest(WPRequest):
 
 			# Before we continue, do we have this page in the cache already?
 			try:
-				page = self.api.wordpress_object_cache.get(class_name=Page.__name__, key=d["id"])
+				page = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
 				pages.append(page)
 				continue
 			except WPORMCacheObjectNotFoundError:
 				pass
 
-			page = Page(api=self.api)
+			page = classobject.__new__(classobject)
+			page.__init__(api=self.api)
 			page.json = json.dumps(d)
 
 			page.update_schema_from_dictionary(d)
@@ -267,6 +268,11 @@ class PageRequest(WPRequest):
 # 				logger.debug(d["title"])
 # 				logger.debug(request_context)
 # 				raise NotImplementedError
+
+			if "_embedded" in d:
+				logger.debug("TODO: implement _embedded content for Page object")
+
+			page.postprocess_response()
 
 			# add to cache
 			self.api.wordpress_object_cache.set(value=page, keys=(page.s.id, page.s.slug))

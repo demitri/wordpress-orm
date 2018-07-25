@@ -52,7 +52,7 @@ class WPEntity(metaclass=ABCMeta):
 		if new_field not in self._schema_fields:
 			self._schema_fields.append(new_field)
 
-	def postprocess_response(self):
+	def postprocess_response(self, data=None):
 		'''
 		Hook to allow custom subclasses to process responses.
 		Usually will access self.json to get the full JSON record that created this entity.

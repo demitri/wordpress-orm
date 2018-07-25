@@ -50,6 +50,7 @@ class Media(WPEntity):
 		'''
 		Returns the author of this post, class: 'User'.
 		'''
+		# TODO: check cache first!
 		if self._author is None:
 			ur = self.api.UserRequest()
 			ur.id = self.s.author # ID for the author of the object
@@ -65,6 +66,7 @@ class Media(WPEntity):
 		'''
 		The post associated with this media item.
 		'''
+		# TODO check cache first
 		if self._associated_post is None:
 			pr = self.api.PostRequest()
 			pr.id = self.s.featured_media
@@ -97,7 +99,7 @@ class MediaRequest(WPRequest):
 				"order", "orderby", "parent", "parent_exclude", "slug", "status",
 				"media_type", "mime_type"]
 	
-	def get(self):
+	def get(self, classobject=Media):
 		self.url = self.api.base_url + "media"
 		
 		if self.id:
@@ -190,49 +192,23 @@ class MediaRequest(WPRequest):
 
 			# Before we continue, do we have this Media in the cache already?
 			try:
-				media = self.api.wordpress_object_cache.get(class_name=Media.__name__, key=d["id"])
+				media = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
 				media_objects.append(media)
 				continue
 			except WPORMCacheObjectNotFoundError:
 				pass
 
-			media = Media(api=self.api)
-			media.json = d
+			media = classobject.__new__(classobject)
+			media.__init__(api=self.api)
+			media.json = json.dumps(d)
 			
 			media.update_schema_from_dictionary(d)
 			
-# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
-# 			#
-# 			#logger.debug(d)
-# 			media.s.date = d["date"]
-# 			media.s.id = d["id"]
-# 			media.s.link = d["link"]
-# 			media.s.slug = d["slug"]
-# 			media.s.type = d["type"]
-# 			media.s.title = d["title"]
-# 			media.s.author = d["author"]
-# 			media.s.alt_text = d["alt_text"]
-# 			media.s.caption = d["caption"]["rendered"]
-# 			media.s.media_type = d["media_type"]
-# 			media.s.mime_type = d["mime_type"]
-# 			media.s.media_details = d["media_details"]
-# 			media.s.source_url = d["source_url"]
-# 
-# 			# Properties applicable only to 'view', 'edit' query contexts
-# 			#
-# 			if request_context in ["view", "edit"]:
-# 				media.s.date_gmt = d["date_gmt"]
-# 				media.s.guid = d["guid"]
-# 				media.s.modified = d["modified"]
-# 				media.s.modified_gmt = d["modified_gmt"]
-# 				media.s.status = d["status"]
-# 				media.s.comment_status = d["comment_status"]
-# 				media.s.ping_status = d["ping_status"]
-# 				media.s.meta = d["meta"]
-# 				media.s.template = d["template"]
-# 				media.s.description = d["description"]["rendered"]
-# 				media.s.post = d["post"]
-				
+			if "_embedded" in d:
+				logger.debug("TODO: implement _embedded content for Media object")
+
+			media.postprocess_response(data=d)
+
 			# add to cache
 			self.api.wordpress_object_cache.set(value=media, keys=(media.s.id, media.s.slug))
 				

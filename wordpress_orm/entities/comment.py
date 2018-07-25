@@ -81,7 +81,7 @@ class CommentRequest(WPRequest):
 				"offset", "order", "orderby", "parent", "parent_exclude", "post",
 				"status", "type", "password"]
 	
-	def get(self):
+	def get(self, classobject=Comment):
 		'''
 		Returns a list of 'Comment' objects that match the parameters set in this object.
 		'''
@@ -131,13 +131,14 @@ class CommentRequest(WPRequest):
 
 			# Before we continue, do we have this Comment in the cache already?
 			try:
-				comment = self.api.wordpress_object_cache.get(class_name=Comment.__name__, key=d["id"])
+				comment = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
 				comments.append(comment)
 				continue
 			except WPORMCacheObjectNotFoundError:
 				pass
 
-			comment = Comment(api=self.api)
+			comment = classobject.__new__(classobject)
+			comment.__init__(api=self.api)
 			comment.json = json.dumps(d)
 			
 			comment.update_schema_from_dictionary(d)
@@ -170,6 +171,11 @@ class CommentRequest(WPRequest):
 # 				comment.s.author_email = d["author_email"]
 # 				comment.s.author_ip = d["author_ip"]
 # 				comment.s.author_user_agent = d["author_user_agent"]
+
+			if "_embedded" in d:
+				logger.debug("TODO: implement _embedded content for Comment object")
+
+			comment.postprocess_response()
 
 			# add to cache
 			self.api.wordpress_object_cache.set(value=comment, keys=(comment.s.id, comment.s.slug))

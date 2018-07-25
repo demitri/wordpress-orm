@@ -247,7 +247,7 @@ class UserRequest(WPRequest):
 
 			# Before we continue, do we have this User in the cache already?
 			try:
-				user = self.api.wordpress_object_cache.get(class_name=User.__name__, key=d["id"])
+				user = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
 				users.append(user)
 				continue
 			except WPORMCacheObjectNotFoundError:
@@ -290,6 +290,9 @@ class UserRequest(WPRequest):
 			
 			user.update_schema_from_dictionary(d)
 			
+			if "_embedded" in d:
+				logger.debug("TODO: implement _embedded content for User object")
+
 			#logger.debug("User response keys: {}".format(d.keys()))
 			
 			# allow subclasses to process single entity

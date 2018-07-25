@@ -178,6 +178,11 @@ class CategoryRequest(WPRequest):
 # 				category.s.parent = d["parent"]
 # 				category.s.meta = d["meta"]
 			
+			if "_embedded" in d:
+				logger.debug("TODO: implement _embedded content for Category object")
+
+			category.postprocess_response()
+			
 			# add to cache
 			self.api.wordpress_object_cache.set(value=category, keys=(category.s.id, category.s.slug))
 

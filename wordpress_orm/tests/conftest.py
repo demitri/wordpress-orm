@@ -6,6 +6,8 @@
 # % py.test --fixtures
 #
 
+# To prevent STDOUT from being captured, add "--capture=no"
+
 import pytest
 from ..api import API
 from requests.auth import HTTPBasicAuth

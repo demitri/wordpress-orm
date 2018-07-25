@@ -72,7 +72,7 @@ class TagRequest(WPRequest):
 		return ["context", "page", "per_page", "search", "exclude", "include", "offset",
 				"order", "orderby", "hide_empty", "post", "slug"]
 
-	def get(self, count=False):
+	def get(self, classobject=Tag, count=False):
 		'''
 		Returns a list of 'Tag' objects that match the parameters set in this object.
 
@@ -157,13 +157,14 @@ class TagRequest(WPRequest):
 
 			# Before we continue, do we have this page in the cache already?
 			try:
-				tag = self.api.wordpress_object_cache.get(class_name=Tag.__name__, key=d["id"])
+				tag = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
 				tags.append(tag)
 				continue
 			except WPORMCacheObjectNotFoundError:
 				pass
 
-			tag = Tag(api=self.api)
+			tag = classobject.__new__(classobject)
+			tag.__init__(api=self.api)
 			tag.json = json.dumps(d)
 
 			tag.update_schema_from_dictionary(d)
@@ -187,6 +188,11 @@ class TagRequest(WPRequest):
 # 				tag.s.description = d["description"]
 # 				tag.s.meta = d["meta"]
 
+			if "_embedded" in d:
+				logger.debug("TODO: implement _embedded content for Tag object")
+				
+			slug.postprocess_response()
+			
 			# add to cache
 			self.api.wordpress_object_cache.set(value=tag, keys=(tag.s.id, tag.s.slug))
 

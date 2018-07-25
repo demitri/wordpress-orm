@@ -84,6 +84,7 @@ class Post(WPEntity):
 		if self._author is None:
 			try:
 				self._author = self.api.user(id=self.s.author)  # ID for the author of the object
+				# TODO does this put the object in the cache?
 			except exc.NoEntityFound:
  				raise exc.UserNotFound("User ID '{0}' not found.".format(self.author))
 # 			ur = self.api.UserRequest()
@@ -181,7 +182,7 @@ class PostRequest(WPRequest):
 				"order", "orderby", "slug", "status", "categories",
 				"categories_exclude", "tags", "tags_exclude", "sticky"]
 
-	def get(self, count=False, embed=True):
+	def get(self, classobject=Post, count=False, embed=True):
 		'''
 		Returns a list of 'Post' objects that match the parameters set in this object.
 		
@@ -313,61 +314,17 @@ class PostRequest(WPRequest):
 		
 			# Before we continue, do we have this Post in the cache already?
 			try:
-				post = self.api.wordpress_object_cache.get(class_name=Post.__name__, key=d["id"])
+				post = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
 				posts.append(post)
 				continue
 			except WPORMCacheObjectNotFoundError:
 				pass
 			
-			post = Post(api=self.api)
+			post = classobject.__new__(classobject)
+			post.__init__(api=self.api)
 			post.json = json.dumps(d)
 
 			post.update_schema_from_dictionary(d)
-
-# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
-# 			#
-# 			post.s.date = d["date"]
-# 			post.s.id = d["id"]
-# 			post.s.link = d["link"]
-# 			post.s.slug = d["slug"]
-# 			post.s.type = d["type"]
-# 			post.s.author = d["author"]
-# 			post.s.excerpt = d["excerpt"]["rendered"]
-# 			post.s.featured_media = d["featured_media"]
-# 			
-# 			# Properties applicable to only 'view', 'edit' query contexts:
-# 			#
-# 			if request_context in ["view", "edit"]:
-# 				post.s.date_gmt = d["date_gmt"]
-# 				post.s.guid = d["guid"]
-# 				post.s.modified = d["modified"]
-# 				post.s.modified_gmt = d["modified_gmt"]
-# 				post.s.status = d["status"]
-# 				post.s.content = d["content"]["rendered"]
-# 				post.s.comment_status = d["comment_status"]
-# 				post.s.ping_status = d["ping_status"]
-# 				post.s.format = d["format"]
-# 				post.s.meta = d["meta"]
-# 				post.s.sticky = d["sticky"]
-# 				post.s.template = d["template"]
-# 				post.s.categories = d["categories"]
-# 				post.s.tags = d["tags"]
-# 				
-# 			# Properties applicable to only 'edit' query contexts
-# 			#
-# 			if request_context in ['edit']:
-# 				post.s.password = d["password"]
-# 			
-# 			# Properties applicable to only 'view' query contexts
-# 			#
-# 			if request_context == 'view':
-# 				post.s.title = d["title"]["rendered"]
-# 			else:
-# 				# not sure what the returned 'title' object looks like
-# 				logger.debug(d)
-# 				logger.debug(d["title"])
-# 				logger.debug(request_context)
-# 				raise NotImplementedError
 		
 			# Check for embedded content
 			if "_embedded" in d:
@@ -426,11 +383,11 @@ class PostRequest(WPRequest):
 									logger.warning("Unknown taxonomy encountered in _embedded data of Post (or something else entirely): {0}".format(json.dumps(term_list)))
 					else:
 						logger.debug("Note: Unhandled embedded content in {0}, key='{1}'".format(self.__class__.__name__, key))
-					
+			
+			post.postprocess_response()
+			
 			# add to cache
 			self.api.wordpress_object_cache.set(value=post, keys=(post.s.id, post.s.slug))
-			#self.api.wordpress_object_cache.set(class_name=Post.__name__, key=post.s.id, value=post)
-			#self.api.wordpress_object_cache.set(class_name=Post.__name__, key=post.s.slug, value=post)
 			
 			posts.append(post)
 			
