@@ -43,6 +43,13 @@ class WPEntity(metaclass=ABCMeta):
 		'''
 		pass
 
+	@abstractproperty
+	def post_fields(self):
+		'''
+		This method returns a list of properties for creating (POSTing) a new entity to WordPress, e.g. ["date", "slug", ...]
+		'''
+		pass
+
 	def add_schema_field(self, new_field):
 		'''
 		Method to allow extending schema fields.
@@ -118,6 +125,10 @@ class WPRequest(metaclass=ABCMeta):
 
 	@abstractmethod
 	def get(self):
+		pass
+		
+	@abstractmethod
+	def post(self):
 		pass
 		
 	def get_response(self):

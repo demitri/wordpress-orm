@@ -6,6 +6,7 @@ WordPress API reference: https://developer.wordpress.org/rest-api/reference/post
 import json
 import logging
 import requests
+import dateutil.parser
 from datetime import datetime
 
 from .wordpress_entity import WPEntity, WPRequest, context_values
@@ -33,7 +34,8 @@ class Post(WPEntity):
 		self._featured_media = None
 		self._comments = None
 		self._categories = None
-			
+		self._date_gmt = None		# datetime object
+					
 	def __repr__(self):
 		if len(self.s.title) < 11:
 			truncated_title = self.s.title
@@ -50,6 +52,33 @@ class Post(WPEntity):
 			   "excerpt", "featured_media", "comment_status", "ping_status", "format",
 			   "meta", "sticky", "template", "categories", "tags"]
 		return self._schema_fields
+
+	@property
+	def post_fields(self):
+		'''
+		Arguments for POST requests.
+		'''
+		if self._post_fields is None:
+			self._post_fields = ["date", "date_gmt", "slug", "status", "password",
+								 "title", "content", "author", "excerpt", "featured_media",
+								 "comment_status", "ping_status", "format", "meta", "sticky",
+								 "template", "categories", "tags"]
+		return self._post_fields
+
+	@property
+	def post(self, new_post=None):
+		'''
+		Create a new Post.
+		'''
+		
+		# Build a list of parameters based on the properties of the provided Post object.
+		post_parameters = list()
+		
+		# date
+		if new_post.s.date
+		
+		???.process_additional_post_fields(new_item=new_post, parameters=post_parameters)
+
 
 	@property
 	def featured_media(self):
@@ -76,6 +105,52 @@ class Post(WPEntity):
 		else:
 			raise ValueError("The featured media of a Post must be an object of class 'Media' ('{0}' provided).".format(type(new_media).__name__))
 	
+	@property
+	def date_gmt(self):
+		'''
+		The date associated with the post in GMT as a datetime object.
+		'''
+		if self._date_gmt is None:
+			if self.s.date_gmt is not None:
+				# format of this field is ISO 8610 (e.g. "2018-07-17T17:33:36")
+				self._date_gmt = dateutil.parser.parse(self.s.date_gmt) # returns datetime object
+			#elif self.s.date is not None:
+				# TODO: convert "date" field to GMT (but need to know the server's time zone to be able to do this)
+			#	pass
+		return self._date_gmt
+		
+	@date_gmt.setter
+	def date_gmt(self, new_date):
+		'''
+		Set the date associated with the post in GMT, takes a datetime.datetime object or a string in ISO 8601 format.
+		'''
+		if isinstance(new_date, datetime.datetime):
+			self._date_gmt = new_date
+		elif isinstance(new_date, str):
+			try:
+				self._date_gmt = dateutil.parser.parse(new_date)
+			except ValueError:
+				raise ValueError("The found 'date_gmt' string from the schema could not be converted to a datetime object.".format(new_date))))
+		else:
+			raise ValueError("'date_gmt' must be set to either a datetime.datetime object or else an ISO 8601 string.")
+		
+	@property
+	def status(self):
+		'''
+		'''
+		return self.s.status
+		
+	@status.setter
+	def status(self, new_status):
+		'''
+		
+		'''
+		new_status = new_status.lower()
+		if new_status in ["publish", "future", "draft", "pending", "private"]:
+			self.s.status = new_status
+		else:
+			raise ValueError('Post status must be one of ["publish", "future", "draft", "pending", "private"].')
+		
 	@property
 	def author(self):
 		'''
@@ -142,6 +217,9 @@ class PostRequest(WPRequest):
 	def __init__(self, api=None, categories=None, slugs=None):		
 		super().__init__(api=api)
 		self.id = None # WordPress ID
+		self._post_fields = None
+		
+		self.url = self.api.base_url + "posts"
 		
 		# values read from the response header
 		self.total = None
@@ -181,16 +259,14 @@ class PostRequest(WPRequest):
 				"author_exclude", "before", "exclude", "include", "offset",
 				"order", "orderby", "slug", "status", "categories",
 				"categories_exclude", "tags", "tags_exclude", "sticky"]
-
+		
 	def get(self, classobject=Post, count=False, embed=True):
 		'''
 		Returns a list of 'Post' objects that match the parameters set in this object.
 		
 		count : Boolean, if True, only returns the number of objects found.
 		embed : include full content of linked resources in the response instead of just the ID, see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
-		'''
-		self.url = self.api.base_url + "posts"
-		
+		'''		
 		if self.id:
 			self.url += "/{}".format(self.id)
 
@@ -392,7 +468,7 @@ class PostRequest(WPRequest):
 			posts.append(post)
 			
 		return posts
-	
+		
 	@property
 	def context(self):
 		if self._context is None:
@@ -454,6 +530,29 @@ class PostRequest(WPRequest):
 			except ValueError:
 				raise ValueError("The 'per_page' parameter must be an integer, was given '{0}'".format(value))
 	
+	@property
+	def after(self):
+		'''
+		WordPress parameter to return posts after this date.
+		'''
+		return self._after
+	
+	@after.setter
+	def after(self, value):
+		'''
+		Set the WordPress parameter to return posts after this date.
+		'''
+		# The stored format is a datetime object, even though WordPress requires
+		# it to be ISO-8601.
+		#
+		if value is None:
+			self.parameters.pop("after", None)
+			self._after = None
+		elif isinstance(value, datetime):
+			self._after = value
+		else:
+			raise ValueError("Th 'after' property only accepts `datetime` objects.")
+
 	@property
 	def author(self):
 		return self._author_ids
@@ -550,29 +649,6 @@ class PostRequest(WPRequest):
 		self._author_exclude.append(author_id)
 
 	@property
-	def after(self):
-		'''
-		WordPress parameter to return posts after this date.
-		'''
-		return self._after
-	
-	@after.setter
-	def after(self, value):
-		'''
-		Set the WordPress parameter to return posts after this date.
-		'''
-		# The stored format is a datetime object, even though WordPress requires
-		# it to be ISO-8601.
-		#
-		if value is None:
-			self.parameters.pop("after", None)
-			self._after = None
-		elif isinstance(value, datetime):
-			self._after = value
-		else:
-			raise ValueError("Th 'after' property only accepts `datetime` objects.")
-
-	@property
 	def before(self):
 		'''
 		WordPress parameter to return posts before this date.
@@ -594,6 +670,30 @@ class PostRequest(WPRequest):
 			self._before = value
 		else:
 			raise ValueError("The 'before' property only accepts `datetime` objects.")
+
+	@property
+	def exclude(self):
+		return self._excludes
+	
+	@exclude.setter(self, values):
+		'''
+		List of WordPress IDs to exclude from a search.
+		'''
+		if values is None:
+			self.parameters.pop("exclude", None)
+			self._excludes = list()
+			return
+		elif not isinstance(values, list):
+			raise ValueError("'excludes' must be provided as a list (or append to the existing list).")
+		
+		for excl in values:
+			if isinstance(inc, int):
+				self._includes.append(str(inc))
+			elif isinstance(inc, str):
+				try:
+					self._includes.append(str(int(inc)))
+				except ValueError:
+					raise ValueError("The WordPress ID (an integer, '{0}' given) must be provided to limit result to specific users.".format(inc))
 
 	@property
 	def include(self):
