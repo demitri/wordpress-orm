@@ -27,7 +27,6 @@ class Post(WPEntity):
 
 	def __init__(self, id=None, session=None, api=None):
 		super().__init__(api=api)
-		self._schema_fields = None
 		
 		# related objects to cache
 		self._author = None
@@ -37,11 +36,13 @@ class Post(WPEntity):
 		self._date_gmt = None		# datetime object
 					
 	def __repr__(self):
-		if len(self.s.title) < 11:
-			truncated_title = self.s.title
+		if self.s.title is None:
+			truncated_title = "<NO TITLE SET>"
+		elif len(self.s.title) < 11:
+			truncated_title = "'{}'".format(self.s.title)
 		else:
-			truncated_title = self.s.title[0:10] + "..."
-		return "<WP {0} object at {1}, id={2}, title='{3}'>".format(self.__class__.__name__,
+			truncated_title = "'{}...'".format(self.s.title[0:10])
+		return "<WP {0} object at {1}, id={2}, title={3}>".format(self.__class__.__name__,
 													 hex(id(self)), self.s.id, truncated_title)
 
 	@property
@@ -59,33 +60,121 @@ class Post(WPEntity):
 		Arguments for POST requests.
 		'''
 		if self._post_fields is None:
-			self._post_fields = ["date", "date_gmt", "slug", "status", "password",
+			# Note that 'date' is excluded in favor of exclusive use of 'date_gmt'.
+			self._post_fields = ["date_gmt", "slug", "status", "password",
 								 "title", "content", "author", "excerpt", "featured_media",
 								 "comment_status", "ping_status", "format", "meta", "sticky",
 								 "template", "categories", "tags"]
 		return self._post_fields
 
 	@property
-	def post(self, new_post=None):
+	def post(self):
 		'''
 		Create a new Post.
 		'''
+
+		url = self.api.base_url + "{}".format("posts")
+		logger.debug("URL = {}".format(url))
 		
 		# Build a list of parameters based on the properties of the provided Post object.
-		post_parameters = list()
+		post_parameters = dict()
+		post_data = dict()
 		
 		# date
-		if new_post.s.date
+		# (Don't use the 'date' parameter as this is in the site's timezone, which we don't know.
+		#  Also note that WordPress doesn't properly support ISO8601,
+		#  see: https://core.trac.wordpress.org/ticket/41032)
 		
-		???.process_additional_post_fields(new_item=new_post, parameters=post_parameters)
+		# date_gmt
+		if self.s.date_gmt is None:
+			post_parameters["date_gmt"] = datetime.now().isoformat()
+		else:
+			post_parameters["date_gmt"] = self.s.date_gmt.isoformat()
+		
+		#slug
+		if self.s.slug is not None:
+			post_parameters["slug"] = self.s.slug
+					
+		#status
+		if self.s.status is not None:
+			post_parameters["status"] = self.s.status
+		
+		#password
+		if self.s.password is not None:
+			post_parameters["password"] = self.s.password
+		
+		#title
+		if self.s.title is not None:
+			post_parameters["title"] = self.s.title
 
+		#content
+		if self.s.content is not None:
+			post_parameters["content"] = self.s.content
 
+		#author
+		if any([self.author, self.s.author]):
+			if self.author is not None:
+				post_parameters["author"] = self.author.s.id
+			else:
+				post_parameters["author"] = self.s.author
+
+		#excerpt
+		if self.s.excerpt is not None:
+			post_parameters["excerpt"] = self.s.excerpt
+
+		#featured_media
+		if any([self.featured_media, self.s.featured_media]):
+			if self.featured_media is not None:
+				post_parameters["featured_media"] = self.featured_media.s.id
+			else:
+				post_parameters["featured_media"] = self.s.featured_media
+
+		#comment_status
+		if self.s.comment_status is not None:
+			post_parameters["comment_status"] = self.s.comment_status
+
+		#ping_status
+		pass
+
+		#format
+		if self.s.format is not None:
+			post_parameters["format"] = self.s.format
+
+		#meta
+		if self.s.sticky is not None:
+			if self.s.sticky == True:
+				post_parameters["sticky"] = "1"
+			else:
+				post_parameters["sticky"] = "0"
+
+		#sticky
+		pass
+
+		#template
+		pass
+
+		#categories
+		pass
+
+		#tags
+		pass
+		
+		#self.preprocess_additional_post_fields(data=post_data, parameters=post_parameters)
+		logger.debug(post_parameters)
+		try:
+			super().post(url=url, data=post_parameters, parameters=post_parameters)
+		except requests.exceptions.HTTPError:
+			logger.debug("Post response code: {}".format(self.post_response.status_code))
+			if self.post_response.status_code == 400: # bad request
+				logger.debug("URL={}".format(self.post_response.url))
+				raise exc.BadRequest("400: Bad request. Error: \n{0}".format(json.dumps(self.post_response.json(), indent=4)))
+				
 	@property
 	def featured_media(self):
 		'''
 		Returns the 'Media' object that is the "featured media" for this post.
 		'''
-		if self._featured_media is None:
+		if self._featured_media is None and self.s.featured_media is not None:
 			
 			media_id = self.s.featured_media
 			if media_id == 0:
@@ -106,17 +195,29 @@ class Post(WPEntity):
 			raise ValueError("The featured media of a Post must be an object of class 'Media' ('{0}' provided).".format(type(new_media).__name__))
 	
 	@property
+	def date(self):
+		'''
+		Raises an exception to warn not to use the 'date' property; use 'date_gmt' instead.
+		'''
+		raise Exception("Although 'date' is a valid property, we don't have access to the WordPress server's time zone. " +
+						"Please use the 'date_gmt' property instead (see: https://core.trac.wordpress.org/ticket/41032).")
+		
+	@date.setter
+	def date(self, new_date):
+		'''
+		Raises an exception to warn not to use the 'date' property; use 'date_gmt' instead.
+		'''
+		raise Exception("The 'date' property depends on knowing the server's time zone, which we don't. " +
+						"Please use the 'date_gmt' property instead (see: https://core.trac.wordpress.org/ticket/41032).")
+		
+	@property
 	def date_gmt(self):
 		'''
 		The date associated with the post in GMT as a datetime object.
 		'''
-		if self._date_gmt is None:
-			if self.s.date_gmt is not None:
-				# format of this field is ISO 8610 (e.g. "2018-07-17T17:33:36")
-				self._date_gmt = dateutil.parser.parse(self.s.date_gmt) # returns datetime object
-			#elif self.s.date is not None:
-				# TODO: convert "date" field to GMT (but need to know the server's time zone to be able to do this)
-			#	pass
+		if self._date_gmt is None and self.s.date_gmt is not None:
+			# format of this field is ISO 8610 (e.g. "2018-07-17T17:33:36")
+			self._date_gmt = dateutil.parser.parse(self.s.date_gmt) # returns datetime object
 		return self._date_gmt
 		
 	@date_gmt.setter
@@ -124,39 +225,46 @@ class Post(WPEntity):
 		'''
 		Set the date associated with the post in GMT, takes a datetime.datetime object or a string in ISO 8601 format.
 		'''
-		if isinstance(new_date, datetime.datetime):
+		if new_date is None:
+			self._date_gmt = None
+			return
+		if isinstance(new_date, datetime):
 			self._date_gmt = new_date
 		elif isinstance(new_date, str):
 			try:
 				self._date_gmt = dateutil.parser.parse(new_date)
 			except ValueError:
-				raise ValueError("The found 'date_gmt' string from the schema could not be converted to a datetime object.".format(new_date))))
+				raise ValueError("The found 'date_gmt' string from the schema could not be converted to a datetime object.".format(new_date))
 		else:
 			raise ValueError("'date_gmt' must be set to either a datetime.datetime object or else an ISO 8601 string.")
 		
 	@property
 	def status(self):
 		'''
+		The status of the post, one of ["publish", "future", "draft", "pending", "private"].
 		'''
 		return self.s.status
 		
 	@status.setter
 	def status(self, new_status):
 		'''
-		
+		Set the status for this post, must be one of ["publish", "future", "draft", "pending", "private"].
 		'''
-		new_status = new_status.lower()
-		if new_status in ["publish", "future", "draft", "pending", "private"]:
-			self.s.status = new_status
+		if new_status is None:
+			self.s.status = None
 		else:
-			raise ValueError('Post status must be one of ["publish", "future", "draft", "pending", "private"].')
+			new_status = new_status.lower()
+			if new_status in ["publish", "future", "draft", "pending", "private"]:
+				self.s.status = new_status
+			else:
+				raise ValueError('Post status must be one of ["publish", "future", "draft", "pending", "private"].')
 		
 	@property
 	def author(self):
 		'''
 		Returns the author of this post, class: 'User'.
 		'''
-		if self._author is None:
+		if self._author is None and self.s.author is not None:
 			try:
 				self._author = self.api.user(id=self.s.author)  # ID for the author of the object
 				# TODO does this put the object in the cache?
@@ -176,11 +284,74 @@ class Post(WPEntity):
 		'''
 		Set the related author object (class User).
 		'''
+		# TODO: could potentially accept an interger ID value.
 		if isinstance(author, User) or author is None:
 			self._author = author
 		else:
 			raise ValueError("The author of a Post must be an object of class 'User' ('{0}' provided).".format(type(new_media).__name__))
 
+	@property
+	def comment_status(self):
+		'''
+		Whether or not comments are open on the object, one of ["open", "closed"].
+		'''
+		return self.comment_status
+		
+	@comment_status.setter
+	def comment_status(self, new_status):
+		'''
+		Set the status for this post, must be one of ["publish", "future", "draft", "pending", "private"].
+		'''
+		if new_status is None:
+			self.new_status = None
+		else:
+			new_status = new_status.lower()
+			if new_status in ["open", "closed"]:
+				self.comment_status = new_status
+			else:
+				raise ValueError('Comment status must be one of ["open", "closed"].')
+
+	@property
+	def ping_status(self):
+		'''
+		Whether or not this post can be pinged., one of ["open", "closed"].
+		'''
+		return self.ping_status
+		
+	@ping_status.setter
+	def ping_status(self, new_status):
+		'''
+		Whether or not this post can be pinged., must be one of ["open", "closed"].
+		'''
+		if new_status is None:
+			self.new_status = None
+		else:
+			new_status = new_status.lower()
+			if new_status in ["open", "closed"]:
+				self.ping_status = new_status
+			else:
+				raise ValueError('Ping status must be one of ["open", "closed"].')
+	
+	@property
+	def format(self):
+		'''
+		The format of the post, one of ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"].
+		'''
+		return self.ping_status
+		
+	@format.setter
+	def format(self, new_value):
+		'''
+		The format of the post, one of ["standard", "aside", "chat", "gallery", "link", "image", "quote", "status", "video", "audio"].
+		'''
+		if new_value is None:
+			self.format = None
+		else:
+			new_value = new_value.lower()
+			if new_value in ["open", "closed"]:
+				self.format = format
+			else:
+				raise ValueError('Format must be one of ["open", "closed"].')
 	
 	@property
 	def comments(self):
@@ -196,7 +367,7 @@ class Post(WPEntity):
 		'''
 		Returns a list of categories (as Category objects) associated with this post.
 		'''
-		if self._categories is None:
+		if self._categories is None and self.s.categories is not None:
 			self._categories = list()
 			for category_id in self.s.categories:
 				try:
@@ -207,7 +378,10 @@ class Post(WPEntity):
 	
 	@property
 	def category_names(self):
-		return [x.s.name for x in self.categories]
+		if self.categories is not None:
+			return [x.s.name for x in self.categories]
+		else:
+			return list()
 	
 
 class PostRequest(WPRequest):
@@ -233,7 +407,7 @@ class PostRequest(WPRequest):
 		self._orderby = None
 		self._page = None
 		self._per_page = None
-		self._sticky = False
+		self._sticky = None
 		
 		self._status = list()
 		self._author_ids = list()
@@ -675,7 +849,8 @@ class PostRequest(WPRequest):
 	def exclude(self):
 		return self._excludes
 	
-	@exclude.setter(self, values):
+	@exclude.setter
+	def exclude(self, values):
 		'''
 		List of WordPress IDs to exclude from a search.
 		'''
@@ -995,9 +1170,15 @@ class PostRequest(WPRequest):
 	@sticky.setter
 	def sticky(self, value):
 		'''
-		Set to 'True' to limit result set to items that are sticky.
+		Set to 'True' to limit result set to items that are sticky, property can be set to one of [True, False, '0', '1', 0, 1].
 		'''
-		self._sticky = (value == True)
-
+		if value is None:
+			self._sticky = None
+		elif value in [True, False]:
+			self._sticky = (value == True)
+		elif value in ['1', '0', 1, 0]:
+			value = (value in ['1',1])
+		else:
+			raise Exception("The property 'sticky' is a Boolean, must be set to one of [True, False, '0', '1', 0, 1].")
 
 

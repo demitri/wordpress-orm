@@ -25,17 +25,22 @@ class WPEntity(metaclass=ABCMeta):
 	def __init__(self, api=None):
 		
 		if api is None:
-			raise Exception("Use the 'API.{0}()' method to create a new '{0}' object.".format(self.__class__.__name__))
+			raise Exception("Use the 'wordpress_orm.API.{0}()' method to create a new '{0}' object (or set the 'api' parameter).".format(self.__class__.__name__))
 		
 		self.api = api			   # holds the connection information
 		self.json = None		   # holds the raw JSON returned from the API
 		self.s = WPSchema()		   # an empty object to use to hold custom properties
 		self._schema_fields = None # a list of the fields in the schema
-		
+		self._post_fields = None   # a list of the fields used in POST queries
+
 		# define the schema properties for the WPSchema object
 		for field in self.schema_fields:
 			setattr(self.s, field, None)
 		
+		# POST fields are also implemented as schema properties
+		for field in self.post_fields:
+			setattr(self.s, field, None)
+				
 	@abstractproperty
 	def schema_fields(self):
 		'''
@@ -66,6 +71,23 @@ class WPEntity(metaclass=ABCMeta):
 		'''
 		pass
 		
+	def post(self, url=None, parameters=None, data=None):
+		'''
+		
+		'''
+		if self.api.session is None:
+			self.post_response = requests.post(url=url, data=data, params=parameters, auth=self.api.auth())
+		else:
+			# use existing session
+			self.post_response = self.api.session.post(url=url, data=data, params=parameters, auth=self.api.auth())
+		self.post_response.raise_for_status()
+
+	def preprocess_additional_post_fields(self, data=None, parameters=None):
+		'''
+		Hook for subclasses to allow for custom processing of POST request data (before the request is made).
+		'''
+		pass
+			
 	def update_schema_from_dictionary(self, d, process_links=False):
 		'''
 		Replaces schema values with those found in provided dictionary whose keys match the field names.
@@ -127,9 +149,9 @@ class WPRequest(metaclass=ABCMeta):
 	def get(self):
 		pass
 		
-	@abstractmethod
-	def post(self):
-		pass
+#	@abstractmethod
+#	def post(self):
+#		pass
 		
 	def get_response(self):
 		if self.response is None:
