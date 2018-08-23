@@ -25,6 +25,7 @@ logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package
 
 @contextmanager
 def wp_session(api=None):
+	logger.warning("Note: 'wp_session' is deprecated. Please change 'with wp_session(wordpress_api)' to 'with wordpress_api.Session()'")
 	api.session = requests.Session()
 	yield api
 	api.session.close()
@@ -80,6 +81,23 @@ class API:
 		else:
 			raise Exception("Unknown or unsupported authentication method.")
 
+	@contextmanager
+	def Session(self):
+		'''
+		Returns requests.Session object; use in the form 'with api.Session()' to use a single session in a block.
+		
+		Calling this method creates a new Session() object, but if used in a 'with' block, any existing value in
+		'self.session' is restored after exiting the block.
+		'''
+		old_session = self.session			# save existing session if there is one
+		new_session = requests.Session()	# create new session
+		self.session = new_session
+		yield new_session
+		
+		# ---------- below here is executed after 'with' block ----------
+
+		self.session = old_session			# restore original session (if there was one)
+		
 	@property
 	def base_url(self):
 		return self._base_url
@@ -90,7 +108,6 @@ class API:
 			url = url + "/"
 		self._base_url = url
 	
-
 	def PostRequest(self, **kwargs):
 		''' Factory method that returns a new PostRequest attached to this API. '''
 		return post.PostRequest(api=kwargs.pop('api', self), **kwargs)

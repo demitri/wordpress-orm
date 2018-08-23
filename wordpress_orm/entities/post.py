@@ -67,7 +67,6 @@ class Post(WPEntity):
 								 "template", "categories", "tags"]
 		return self._post_fields
 
-	@property
 	def post(self):
 		'''
 		Create a new Post.
