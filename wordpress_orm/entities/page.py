@@ -40,10 +40,12 @@ class Page(WPEntity):
 
 	@property
 	def schema_fields(self):
-		return ["date", "date_gmt", "guid", "id", "link", "modified", "modified_gmt",
-			   "slug", "status", "type", "password", "parent", "title", "content", "author",
-			   "excerpt", "featured_media", "comment_status", "ping_status", "menu_order",
-			   "meta", "template"]
+		if self._schema_fields is None:
+			self._schema_fields = ["date", "date_gmt", "guid", "id", "link", "modified", "modified_gmt",
+			   					   "slug", "status", "type", "password", "parent", "title", "content", "author",
+			   					   "excerpt", "featured_media", "comment_status", "ping_status", "menu_order",
+			   					   "meta", "template"]
+		return self._schema_fields
 
 	@property
 	def featured_media(self):
@@ -87,6 +89,8 @@ class PageRequest(WPRequest):
 		super().__init__(api=api)
 		self.id = None # WordPress ID
 
+		self.url = self.api.base_url + "pages"
+
 		# values read from the response header
 		self.total = None
 		self.total_pages = None
@@ -114,25 +118,16 @@ class PageRequest(WPRequest):
 		'''
 		Page request parameters.
 		'''
-		return ["context", "page", "per_page", "search", "after", "author",
-				"author_exclude", "before", "exclude", "include", "menu_order", "offset",
-				"order", "orderby", "parent", "parent_exclude", "slug", "status"]
+		if self._parameter_names is None:
+			self._parameter_names = ["context", "page", "per_page", "search", "after", "author",
+									 "author_exclude", "before", "exclude", "include", "menu_order", "offset",
+									 "order", "orderby", "parent", "parent_exclude", "slug", "status"]
+		return self._parameter_names
 
-	def get(self, classname=Page, count=False):
+	def populate_request_parameters(self):
 		'''
-		Returns a list of 'Page' objects that match the parameters set in this object.
-
-		count : Boolean, if True, only returns the number of object found.
-
+		Populates 'self.parameters' to prepare for executing a request.
 		'''
-		self.url = self.api.base_url + "pages"
-
-		if self.id:
-			self.url += "/{}".format(self.id)
-
-		# -------------------
-		# populate parameters
-		# -------------------
 		if self.context:
 			self.parameters["context"] = self.context
 			request_context = self.context
@@ -175,11 +170,22 @@ class PageRequest(WPRequest):
 
 		if self.menu_order:
 			self.parameters["menu_order"] = self.menu_order
+	
+	def get(self, class_object=Page, count=False):
+		'''
+		Returns a list of 'Page' objects that match the parameters set in this object.
 
-		# -------------------
+		count : Boolean, if True, only returns the number of objects found.
+		'''
+		
+
+		#if self.id:
+		#	self.url += "/{}".format(self.id)
+
+		self.populate_request_parameters() # populates 'self.parameters'
 
 		try:
-			self.get_response()
+			self.get_response(wpid=self.id)
 			logger.debug("URL='{}'".format(self.request.url))
 		except requests.exceptions.HTTPError:
 			logger.debug("page response code: {}".format(self.response.status_code))
@@ -190,9 +196,14 @@ class PageRequest(WPRequest):
 				return None
 			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
 
-		# read response headers
-		self.total = self.response.headers['X-WP-Total']
-		self.total_pages = self.response.headers['X-WP-TotalPages']
+		self.process_response_headers()
+
+		if count:
+			# return just the number of objects that match this request
+			if self.total is None:
+				raise Exception("Header 'X-WP-Total' was not found.") # if you are getting this, modify to use len(posts_data)
+			return self.total
+			#return len(pages_data)
 
 		pages_data = self.response.json()
 
@@ -200,86 +211,31 @@ class PageRequest(WPRequest):
 			# only one object was returned; make it a list
 			pages_data = [pages_data]
 
-		if count:
-			return len(pages_data)
-
 		pages = list()
 		for d in pages_data:
 
 			# Before we continue, do we have this page in the cache already?
 			try:
 				page = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
-				pages.append(page)
-				continue
 			except WPORMCacheObjectNotFoundError:
-				pass
-
-			page = classobject.__new__(classobject)
-			page.__init__(api=self.api)
-			page.json = json.dumps(d)
-
-			page.update_schema_from_dictionary(d)
-
-# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
-# 			#
-# 			page.s.date = d["date"]
-# 			page.s.id = d["id"]
-# 			page.s.link = d["link"]
-# 			page.s.slug = d["slug"]
-# 			page.s.type = d["type"]
-# 			page.s.title = d["title"]
-# 			page.s.author = d["author"]
-# 			page.s.excerpt = d["excerpt"]["rendered"]
-# 			page.s.featured_media = d["featured_media"]
-# 
-# 			# Properties applicable to only 'view', 'edit' query contexts:
-# 			#
-# 			if request_context in ["view", "edit"]:
-# #				view_edit_properties = ["date_gmt", "guid", "modified", "modified_gmt", "status",
-# #										"content", "comment_status", "ping_status", "format", "meta",
-# #										"sticky", "template", "categories", "tags"]
-# #				for key in view_edit_properties:
-# #					setattr(page.s, key, d[key])
-# 				page.s.date_gmt = d["date_gmt"]
-# 				page.s.guid = d["guid"]
-# 				page.s.modified = d["modified"]
-# 				page.s.modified_gmt = d["modified_gmt"]
-# 				page.s.status = d["status"]
-# 				page.s.parent = d["parent"]
-# 				page.s.content = d["content"]["rendered"]
-# 				page.s.comment_status = d["comment_status"]
-# 				page.s.ping_status = d["ping_status"]
-# 				page.s.menu_order = d["menu_order"]
-# 				page.s.meta = d["meta"]
-# 				page.s.template = d["template"]
-# 
-# 			# Properties applicable to only 'edit' query contexts
-# 			#
-# 			if request_context in ['edit']:
-# 				page.s.password = d["password"]
-# 
-# 			# Properties applicable to only 'view' query contexts
-# 			#
-# 			if request_context == 'view':
-# 				page.s.title = d["title"]["rendered"]
-# 			else:
-# 				# not sure what the returned 'title' object looks like
-# 				logger.debug(d)
-# 				logger.debug(d["title"])
-# 				logger.debug(request_context)
-# 				raise NotImplementedError
-
-			if "_embedded" in d:
-				logger.debug("TODO: implement _embedded content for Page object")
-
-			page.postprocess_response()
-
-			# add to cache
-			self.api.wordpress_object_cache.set(value=page, keys=(page.s.id, page.s.slug))
-
-
-			pages.append(page)
-
+				# create new object
+				page = classobject.__new__(classobject) # default = Page()
+				page.__init__(api=self.api)
+				page.json = json.dumps(d)
+	
+				page.update_schema_from_dictionary(d)
+		
+				if "_embedded" in d:
+					logger.debug("TODO: implement _embedded content for Page object")
+	
+				# perform postprocessing for custom fields
+				page.postprocess_response()
+	
+				# add to cache
+				self.api.wordpress_object_cache.set(value=page, keys=(page.s.id, page.s.slug))
+			finally:
+				pages.append(page)
+				
 		return pages
 
 	@property

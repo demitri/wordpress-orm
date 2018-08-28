@@ -35,10 +35,12 @@ class Comment(WPEntity):
 	
 	@property
 	def schema_fields(self):
-		return ["id", "author", "author_email", "author_ip", "author_name",
-				"author_url", "author_user_agent", "content", "date",
-				"date_gmt", "link", "parent", "post", "status", "type",
-				"author_avatar_urls", "meta"]
+		if self._schema_fields is None:
+			self._schema_fields = ["id", "author", "author_email", "author_ip", "author_name",
+								   "author_url", "author_user_agent", "content", "date",
+								   "date_gmt", "link", "parent", "post", "status", "type",
+								   "author_avatar_urls", "meta"]
+		return self._schema_fields
 	
 	def author(self):
 		'''
@@ -63,6 +65,8 @@ class CommentRequest(WPRequest):
 		super().__init__(api=api)
 		self.id = None # WordPress ID
 		
+		self.url = self.api.base_url + "comments"
+		
 		self._context = None
 		self._posts = list()
 
@@ -76,23 +80,17 @@ class CommentRequest(WPRequest):
 		
 	@property
 	def parameter_names(self):
-		return ["context ", "page", "per_page", "search", "after", "author",
+		if self._parameter_names is None:
+			self._parameter_names = ["context ", "page", "per_page", "search", "after", "author",
 				"author_exclude", "author_email", "before", "exclude", "include",
 				"offset", "order", "orderby", "parent", "parent_exclude", "post",
 				"status", "type", "password"]
+		return self._parameter_names
 	
-	def get(self, classobject=Comment):
+	def populate_request_parameters(self):
 		'''
-		Returns a list of 'Comment' objects that match the parameters set in this object.
+		Populates 'self.parameters' to prepare for executing a request.
 		'''
-		self.url = self.api.base_url + "comments"
-		
-		if self.id:
-			self.url += "/{}".format(self.id)
-		
-		# -------------------
-		# populate parameters
-		# -------------------
 		if self.context:
 			self.parameters["context"] = self.context
 			request_context = self.context
@@ -105,11 +103,20 @@ class CommentRequest(WPRequest):
 		if len(self.posts) > 0:
 			logger.debug("Posts: {0}".format(self.posts))
 			self.parameters["post"] = ",".join(self.posts) # post ID
-		# -------------------
+
+	def get(self, class_object=Comment):
+		'''
+		Returns a list of 'Comment' objects that match the parameters set in this object.
+		'''
+		
+		#if self.id:
+		#	self.url += "/{}".format(self.id)
+		
+		self.populate_request_parameters()
 
 		try:
 			logger.debug("URL='{}'".format(self.request.url))
-			self.get_response()
+			self.get_response(wpid=self.id)
 		except requests.exceptions.HTTPError:
 			logger.debug("Post response code: {}".format(self.response.status_code))
 			if self.response.status_code == 400: # bad request
@@ -119,6 +126,14 @@ class CommentRequest(WPRequest):
 				return None
 			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
 
+		self.process_response_headers()
+
+		if count:
+			# return just the number of objects that match this request
+			if self.total is None:
+				raise Exception("Header 'X-WP-Total' was not found.") # if you are getting this, modify to use len(posts_data)
+			return self.total
+			#return len(pages_data)
 
 		comments_data = self.response.json()
 		
@@ -132,55 +147,24 @@ class CommentRequest(WPRequest):
 			# Before we continue, do we have this Comment in the cache already?
 			try:
 				comment = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
-				comments.append(comment)
-				continue
 			except WPORMCacheObjectNotFoundError:
-				pass
-
-			comment = classobject.__new__(classobject)
-			comment.__init__(api=self.api)
-			comment.json = json.dumps(d)
-			
-			comment.update_schema_from_dictionary(d)
-			
-# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
-# 			#
-# 			comment.s.id = d["id"]
-# 			comment.s.author = d["author"]
-# 			comment.s.author_name = d["author_name"]
-# 			comment.s.author_url = d["author_url"]
-# 			comment.s.content = d["content"]["rendered"]
-# 			comment.s.date = d["date"]
-# 			comment.s.link = d["link"]
-# 			comment.s.parent = d["parent"]
-# 			comment.s.type = d["type"]
-# 			comment.s.author_avatar_urls = d["author_avatar_urls"]
-# 
-# 			# Properties applicable to only 'view', 'edit' query contexts:
-# 			#
-# 			if request_context in ["view", "edit"]:
-# 				comment.s.date_gmt = d["date_gmt"]
-# 				comment.s.post = d["post"]
-# 				comment.s.status = d["status"]
-# 				comment.s.meta = d["meta"]
-# 			
-# 			
-# 			# Properties applicable to only 'edit' query contexts:
-# 			#
-# 			if request_context in ["edit"]:
-# 				comment.s.author_email = d["author_email"]
-# 				comment.s.author_ip = d["author_ip"]
-# 				comment.s.author_user_agent = d["author_user_agent"]
-
-			if "_embedded" in d:
-				logger.debug("TODO: implement _embedded content for Comment object")
-
-			comment.postprocess_response()
-
-			# add to cache
-			self.api.wordpress_object_cache.set(value=comment, keys=(comment.s.id, comment.s.slug))
-
-			comments.append(comment)
+				# create new object
+				comment = classobject.__new__(classobject) # default = Comment()
+				comment.__init__(api=self.api)
+				comment.json = json.dumps(d)
+				
+				comment.update_schema_from_dictionary(d)
+					
+				if "_embedded" in d:
+					logger.debug("TODO: implement _embedded content for Comment object")
+	
+				# perform postprocessing for custom fields
+				comment.postprocess_response()
+	
+				# add to cache
+				self.api.wordpress_object_cache.set(value=comment, keys=(comment.s.id, comment.s.slug))
+			finally:
+				comments.append(comment)
 		
 		return comments
 		
@@ -283,18 +267,6 @@ class CommentRequest(WPRequest):
 				except ValueError:
 					raise ValueError("Posts must be provided as a list of (or append to the existing list). Accepts 'Post' objects or Post IDs.")
 			self._posts.append(str(post_id))
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

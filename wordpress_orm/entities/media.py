@@ -34,10 +34,24 @@ class Media(WPEntity):
 
 	@property																			
 	def schema_fields(self):
-		return ["date", "date_gmt", "guid", "id", "link", "modified", "modified_gmt",
-			    "slug", "status", "type", "title", "author", "comment_status",
-			    "ping_status", "meta", "template", "alt_text", "caption", "description",
-			    "media_type", "mime_type", "media_details", "post", "source_url"]
+		if self._schema_fields is None:
+			self._schema_fields = ["date", "date_gmt", "guid", "id", "link", "modified", "modified_gmt",
+			    				   "slug", "status", "type", "title", "author", "comment_status",
+			    				   "ping_status", "meta", "template", "alt_text", "caption", "description",
+			    				   "media_type", "mime_type", "media_details", "post", "source_url"]
+		return self._schema_fields
+
+	@property
+ 	def post_fields(self):
+ 		'''
+ 		Arguments for Media POST requests.
+ 		'''
+ 		if self._post_fields is None:
+ 			# Note that 'date' is excluded in favor of exclusive use of 'date_gmt'.
+ 			self._post_fields = ["date_gmt", "slug", "status", "title", "author",
+ 								 "comment_status", "ping_status", "meta", "template",
+ 								 "alt_text", "caption", "description", "post"]
+ 		return self._post_fields
 
 	@property
 	def media_type(self):
@@ -87,6 +101,8 @@ class MediaRequest(WPRequest):
 		super().__init__(api=api)
 		self.id = None # WordPress id
 		
+		self.url = self.api.base_url + "media"
+		
 		# parameters that undergo validation, i.e. need custom setter
 		# default values set here
 		self._context = None #"view"
@@ -95,22 +111,17 @@ class MediaRequest(WPRequest):
 
 	@property
 	def parameter_names(self):
-		return ["context", "page", "per_page", "search", "after", "author",
-				"author_exclude", "before", "exclude", "include", "offset",
-				"order", "orderby", "parent", "parent_exclude", "slug", "status",
-				"media_type", "mime_type"]
+		if self._parameter_names is None:
+			self._parameter_names = ["context", "page", "per_page", "search", "after", "author",
+									 "author_exclude", "before", "exclude", "include", "offset",
+									 "order", "orderby", "parent", "parent_exclude", "slug", "status",
+									 "media_type", "mime_type"]
+		return self._parameter_names
 	
-	def get(self, classobject=Media):
-		self.url = self.api.base_url + "media"
-		
-		if self.id:
-			self.url += "/{}".format(self.id)
-		
-#		logger.debug("URL='{}'".format(self.url))
-
-		# -------------------
-		# populate parameters
-		# -------------------
+	def populate_request_parameters(self):
+		'''
+		Populates 'self.parameters' to prepare for executing a request.
+		'''
 		if self.context:
 			self.parameters["context"] = self.context
 			request_context = self.context
@@ -170,17 +181,38 @@ class MediaRequest(WPRequest):
 
 		if self.mime_type:
 			assert False, "Field 'mime_type' not yet implemented."
-		
-		# -------------------
 
+	def get(self, class_object=Media, count=False):
+		'''
+		Returns a list of 'Media' objects that match the parameters set in this object.
+
+		count : Boolean, if True, only returns the number of object found.
+		'''
+		
+		#if self.id:
+		#	self.url += "/{}".format(self.id)
+		
+#		logger.debug("URL='{}'".format(self.url))
+
+		self.populate_request_parameters()
+		
 		try:
-			self.get_response()
+			self.get_response(wpid=self.id)
 			logger.debug("URL='{}'".format(self.request.url))
 		except requests.exceptions.HTTPError:
 			logger.debug("HTTP error! media response code: {}".format(self.response.status_code))
 			if self.response.status_code == 404:
 				return None
 			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
+
+		self.process_response_headers()
+
+		if count:
+			# return just the number of objects that match this request
+			if self.total is None:
+				raise Exception("Header 'X-WP-Total' was not found.") # if you are getting this, modify to use len(posts_data)
+			return self.total
+			#return len(pages_data)
 
 		media_data = self.response.json()
 
@@ -195,7 +227,7 @@ class MediaRequest(WPRequest):
 			try:
 				media = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
 			except WPORMCacheObjectNotFoundError:
-				media = classobject.__new__(classobject)
+				media = classobject.__new__(classobject) # default = Media()
 				media.__init__(api=self.api)
 				media.json = json.dumps(d)
 				
@@ -204,12 +236,13 @@ class MediaRequest(WPRequest):
 				if "_embedded" in d:
 					logger.debug("TODO: implement _embedded content for Media object")
 	
+				# perform postprocessing for custom fields
 				media.postprocess_response(data=d)
 	
 				# add to cache
 				self.api.wordpress_object_cache.set(value=media, keys=(media.s.id, media.s.slug))
-				
-			media_objects.append(media)
+			finally:
+				media_objects.append(media)
 		
 		return media_objects
 	
@@ -273,21 +306,3 @@ class MediaRequest(WPRequest):
 	
 
 			
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -16,7 +16,7 @@ class WPSchema():
 	#
 	# Properties are defined based on the field names, see below.
 	#
-	pass	
+	pass
 
 class WPEntity(metaclass=ABCMeta):
 	'''
@@ -73,7 +73,7 @@ class WPEntity(metaclass=ABCMeta):
 		
 	def post(self, url=None, parameters=None, data=None):
 		'''
-		
+		Implementation of HTTP POST comment for WordPress entities.
 		'''
 		if self.api.session is None:
 			self.post_response = requests.post(url=url, data=data, params=parameters, auth=self.api.auth())
@@ -126,6 +126,11 @@ class WPRequest(metaclass=ABCMeta):
 		if api is None:
 			raise Exception("Create this object ('{0}') from the API object, not directly.".format(self.__class__.__name__))
 		
+		# WordPress headers ('X-WP-*')
+		self.total = None		# X-WP-Total
+		self.total_pages = None # X-WP-TotalPages
+		self.nonce = None		# X-WP-Nonce
+		
 		self.api = api
 		self.parameters = dict()
 		self.response = None
@@ -146,22 +151,41 @@ class WPRequest(metaclass=ABCMeta):
 		pass
 
 	@abstractmethod
-	def get(self):
+	def get(self, class_object=None):
 		pass
+	
+	@abstractmethod
+	def process_response_headers(self):
+		'''
+		Handle any customization of parsing response headers, processes X-WP-* headers by default.
+		'''
+		# read response headers
+		if 'X-WP-Total' in self.response.headers:
+			self.total = self.response.headers['X-WP-Total']
+		if 'X-WP-TotalPages' in self.response.headers:
+			self.total_pages = self.response.headers['X-WP-TotalPages']
+		if 'X-WP-Nonce' in self.response.headers:
+			self.nonce = self.response.headers['X-WP-Nonce']
+	
+	def get_response(self, wpid=None):
+		'''
 		
-#	@abstractmethod
-#	def post(self):
-#		pass
-		
-	def get_response(self):
+		wpid : specify this if a specific WordPress object (of given ID) is being requested
+		'''
 		if self.response is None:
+		
+			if wpid is None:
+				url = self.url
+			else:
+				url += "/{}".format(wpid)
+		
 			if self.api.session is None:
 				#logger.debug("creating new request")
 				# no exiting request, create a new one
-				self.response = requests.get(url=self.url, params=self.parameters, auth=self.api.auth())
+				self.response = requests.get(url=url, params=self.parameters, auth=self.api.auth())
 			else:
 				# use existing session
-				self.response = self.api.session.get(url=self.url, params=self.parameters, auth=self.api.auth())
+				self.response = self.api.session.get(url=url, params=self.parameters, auth=self.api.auth())
 		self.response.raise_for_status()
 		#return self.response
 		
@@ -171,6 +195,4 @@ class WPRequest(metaclass=ABCMeta):
 			return self.response.request
 		else:
 			return None
-#		else:
-#			return self.response.request
 

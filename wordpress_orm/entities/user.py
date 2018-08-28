@@ -33,25 +33,6 @@ class User(WPEntity):
 				   "roles", "password", "capabilities", "extra_capabilities", "avatar_urls", "meta"]
 		return self._schema_fields
 
-# 	def populate_from_dictionary(self, d):
-# 		'''
-# 		Populate this user's schema from the provided dictionary.
-# 		
-# 		This is useful to parse the JSON dictionary returned by the WordPress API or embedded content
-# 		(see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding).
-# 		'''
-# 		if d is None or not isinstance(d, dict):
-# 			raise ValueError("The method 'populate_from_dictionary' expects a dictionary.")
-# 		
-# 		for key in ["id", "name", "url", "description", "link", "slug", "avatar_urls", "meta",
-# 					"username", "first_name", "last_name", "email", "locale", "nickname",
-# 					"registered_date", "roles", "capabilities", "extra_capabilities"]:
-# 			if key in d:
-# 				setattr(self.s, key, d[key])
-# 		if d["id"]:
-# 			self.u.id = d["id"]
-
-
 	def commit(self):
 		'''
 		Creates a new user or updates an existing user via the API.
@@ -138,11 +119,18 @@ class User(WPEntity):
 
 class UserRequest(WPRequest):
 	'''
-	
+	A class that encapsulates requests for WordPress users.
 	'''
 	def __init__(self, api=None):
 		super().__init__(api=api)
 		self.id = None # WordPress ID
+		
+		self.url = self.api.base_url + 'users'
+		
+		# values from headers
+		self.total = None
+		self.total_pages = None
+		
 		self._page = None
 		self._per_page = None
 		self._offset = None
@@ -162,19 +150,10 @@ class UserRequest(WPRequest):
 									 "include", "offset", "order", "orderby", "slug", "roles"]
 		return self._parameter_names
 	
-	# ========================================= perform query ==================================
-
-	def get(self, classobject=User):
+	def populate_request_parameters(self):
 		'''
+		Populates 'self.parameters' to prepare for executing a request.
 		'''
-		self.url = self.api.base_url + 'users'
-		
-		if self.id:
-			self.url += "/{}".format(self.id)
-				
-		# -------------------
-		# populate parameters
-		# -------------------
 		if self.context:
 			self.parameters["context"] = self.context
 			request_context = self.context
@@ -218,10 +197,20 @@ class UserRequest(WPRequest):
 		if len(self.roles) > 0:
 			self.parameters["roles"] = ",".join(self.roles)
 
-		# -------------------
+	def get(self, class_object=User, count=False):
+		'''
+		Returns a list of 'Tag' objects that match the parameters set in this object.
+
+		count : Boolean, if True, only returns the number of object found.
+		'''
+		
+		#if self.id:
+		#	self.url += "/{}".format(self.id)
+		
+		self.populate_request_parameters()
 
 		try:
-			self.get_response()
+			self.get_response(wpid=self.id)
 			logger.debug("URL='{}'".format(self.request.url))
 		except requests.exceptions.HTTPError:
 			logger.debug("User response code: {}".format(self.response.status_code))
@@ -236,6 +225,14 @@ class UserRequest(WPRequest):
 #					return None
 			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
 
+		self.process_response_headers()
+	
+		if count:
+			# return just the number of objects that match this request
+			if self.total is None:
+				raise Exception("Header 'X-WP-Total' was not found.") # if you are getting this, modify to use len(posts_data)
+			return self.total
+	
 		users_data = self.response.json()
 		
 		if isinstance(users_data, dict):
@@ -251,58 +248,22 @@ class UserRequest(WPRequest):
 				users.append(user)
 				continue
 			except WPORMCacheObjectNotFoundError:
-				pass
-
-			user = classobject.__new__(classobject)
-			user.__init__(api=self.api)
-			user.json = json.dumps(d)
-			
-			# Properties applicable to 'view', 'edit', 'embed' query contexts
-			#
-			#   "id", "name", "url", "description", "link", "slug", "avatar_urls"
-			#
-# 			user.s.id = d["id"]
-# 			user.s.name = d["name"]
-# 			user.s.url = d["url"]
-# 			user.s.description = d["description"]
-# 			user.s.link = d["link"]
-# 			user.s.slug = d["slug"]
-# 			user.s.avatar_urls = d["avatar_urls"]
-# 
-# 			# Properties applicable to only 'view', 'edit' query contexts:
-# 			#
-# 			if request_context in ["view", "edit"]:
-# 				user.meta = d["meta"]
-# 			
-# 			# Properties applicable to only 'edit' query contexts
-# 			#
-# 			if request_context in ["edit"]:
-# 				user.s.username = d["username"]
-# 				user.s.first_name = d["first_name"]
-# 				user.s.last_name = d["last_name"]
-# 				user.s.email = d["email"]
-# 				user.s.locale = d["locale"]
-# 				user.s.nickname = d["nickname"]
-# 				user.s.registered_date = d["registered_date"]
-# 				user.s.roles = d["roles"]
-# 				user.s.capabilities = d["capabilities"]
-# 				user.s.extra_capabilities = d["extra_capabilities"]
-			
-			user.update_schema_from_dictionary(d)
-			
-			if "_embedded" in d:
-				logger.debug("TODO: implement _embedded content for User object")
-
-			#logger.debug("User response keys: {}".format(d.keys()))
-			
-			# allow subclasses to process single entity
-			#logger.debug("json: {0}".format(user.json))
-			user.postprocess_response()
-			
-			# add to cache
-			self.api.wordpress_object_cache.set(value=user, keys=(user.s.id, user.s.slug))
-
-			users.append(user)
+				user = classobject.__new__(classobject)
+				user.__init__(api=self.api)
+				user.json = json.dumps(d)
+				
+				user.update_schema_from_dictionary(d)
+				
+				if "_embedded" in d:
+					logger.debug("TODO: implement _embedded content for User object")
+	
+				# perform postprocessing for custom fields
+				user.postprocess_response()
+				
+				# add to cache
+				self.api.wordpress_object_cache.set(value=user, keys=(user.s.id, user.s.slug))
+			finally:
+				users.append(user)
 
 		return users
 

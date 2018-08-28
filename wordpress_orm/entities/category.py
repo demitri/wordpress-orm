@@ -31,7 +31,10 @@ class Category(WPEntity):
 	
 	@property
 	def schema_fields(self):
-		return ["id", "count", "description", "link", "name", "slug", "taxonomy", "parent", "meta"]
+		if self._schema_fields is None:
+			# These are the default WordPress fields for the "category" object.
+			self._schema_fields = ["id", "count", "description", "link", "name", "slug", "taxonomy", "parent", "meta"]
+		return self._schema_fields
 	
 	# Pass-through properties
 	# -----------------------
@@ -71,11 +74,21 @@ class Category(WPEntity):
 # 	def meta(self):
 # 		return self.s.meta
 
+	@property
+	def post_fields(self):
+		'''
+		Arguments for Category POST requests.
+		'''
+		if self._post_fields is None:
+			self._post_fields = ["description", "name", "slug", "parent", "meta"]
+		return self._post_fields
+
 	
 	def posts(self):
 		'''
 		Return a list of posts (type: Post) that have this category.
 		'''
+		# maybe not cache this...?
 		if self._posts is None:
 			pr = self.api.PostRequest()
 			pr.categories.append(self)
@@ -91,41 +104,46 @@ class CategoryRequest(WPRequest):
 		super().__init__(api=api)
 		self.id = None # WordPress ID
 		
+		self.url = self.api.base_url + "categories"
+		
 		# parameters that undergo validation, i.e. need custom setter
 		#
 		self._hide_empty = None
 		self._per_page = None
 		
 	@property
-	def parameter_names(self):	
-		return ["context", "page", "per_page", "search", "exclude", "include",
-				"order", "orderby", "hide_empty", "parent", "post", "slug"]
+	def parameter_names(self):
+		if self._parameter_names is None:
+			self._parameter_names = ["context", "page", "per_page", "search", "exclude", "include",
+									 "order", "orderby", "hide_empty", "parent", "post", "slug"]
+		return self._parameter_names
 	
-	def get(self):
+	def populate_request_parameters(self):
 		'''
-		Returns a list of 'Post' objects that match the parameters set in this object.
+		Populates 'self.parameters' to prepare for executing a request.
 		'''
-		self.url = self.api.base_url + "categories"
-		
-		if self.id:
-			self.url += "/{}".format(self.id)
-
-		# populate parameters
-		#
 		if self.context:
 			self.parameters["context"] = self.context
 			request_context = self.context
 		else:
 			request_context = "view" # default value
 
-		# populate parameters
-		#
 		for param in self.parameter_names:
 			if getattr(self, param, None):
 				self.parameters[param] = getattr(self, param)
 
+	def get(self, class_object=Category, count=False):
+		'''
+		Returns a list of 'Category' objects that match the parameters set in this object.
+		'''
+		
+		#if self.id:
+		#	self.url += "/{}".format(self.id)
+
+		self.populate_request_parameters()
+
 		try:
-			self.get_response()
+			self.get_response(wpid=self.id)
 			logger.debug("URL='{}'".format(self.request.url))
 		except requests.exceptions.HTTPError:
 			logger.debug("Post response code: {}".format(self.response.status_code))
@@ -137,8 +155,16 @@ class CategoryRequest(WPRequest):
 			elif self.response.status_code == 500: # 
 				raise Exception("500: Internal Server Error. Error: \n{0}".format(self.response.json()))
 			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
-
 				
+		self.process_response_headers()
+
+		if count:
+			# return just the number of objects that match this request
+			if self.total is None:
+				raise Exception("Header 'X-WP-Total' was not found.") # if you are getting this, modify to use len(posts_data)
+			return self.total
+			#return len(pages_data)
+
 		categories_data = self.response.json()
 		
 		if isinstance(categories_data, dict):
@@ -151,42 +177,26 @@ class CategoryRequest(WPRequest):
 			# Before we continue, do we have this Category in the cache already?
 			try:
 				logger.debug(d)
-				category = self.api.wordpress_object_cache.get(Category.__name__, key=d["id"])
+				category = self.api.wordpress_object_cache.get(class_object.__name__, key=d["id"]) # default = Category()
 				categories.append(category)
 				continue
 			except WPORMCacheObjectNotFoundError:
-				pass
-
-			category = Category(api=self.api)
-			category.json = json.dumps(d)
-			
-			category.update_schema_from_dictionary(d)
-
-# 			# Properties applicable to 'view', 'edit', 'embed' query contexts
-# 			#
-# 			category.s.id = d["id"]
-# 			category.s.link = d["link"]
-# 			category.s.name = d["name"]
-# 			category.s.slug = d["slug"]
-# 			category.s.taxonomy = d["taxonomy"]
-# 			
-# 			# Properties applicable to only 'view', 'edit' query contexts:
-# 			#
-# 			if request_context in ["view", "edit"]:
-# 				category.s.count = d["count"]
-# 				category.s.description = d["description"]
-# 				category.s.parent = d["parent"]
-# 				category.s.meta = d["meta"]
-			
-			if "_embedded" in d:
-				logger.debug("TODO: implement _embedded content for Category object")
-
-			category.postprocess_response()
-			
-			# add to cache
-			self.api.wordpress_object_cache.set(value=category, keys=(category.s.id, category.s.slug))
-
-			categories.append(category)
+				category = classobject.__new__(classobject) # default = Category()
+				category.__init__(api=self.api)
+				category.json = json.dumps(d)
+				
+				category.update_schema_from_dictionary(d)
+					
+				if "_embedded" in d:
+					logger.debug("TODO: implement _embedded content for Category object")
+	
+				# perform postprocessing for custom fields
+				category.postprocess_response()
+				
+				# add to cache
+				self.api.wordpress_object_cache.set(value=category, keys=(category.s.id, category.s.slug))
+			finally:
+				categories.append(category)
 		
 		return categories
 
@@ -294,14 +304,3 @@ class CategoryRequest(WPRequest):
 			raise ValueError("The 'per_page' parameter should be a number.")
 	
 	
-
-
-
-
-
-
-
-
-
-
-

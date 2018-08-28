@@ -49,9 +49,9 @@ class Post(WPEntity):
 	def schema_fields(self):
 		if self._schema_fields is None:
 			self._schema_fields = ["date", "date_gmt", "guid", "id", "link", "modified", "modified_gmt",
-			   "slug", "status", "type", "password", "title", "content", "author",
-			   "excerpt", "featured_media", "comment_status", "ping_status", "format",
-			   "meta", "sticky", "template", "categories", "tags"]
+			  					   "slug", "status", "type", "password", "title", "content", "author",
+			  					   "excerpt", "featured_media", "comment_status", "ping_status", "format",
+			  					   "meta", "sticky", "template", "categories", "tags"]
 		return self._schema_fields
 
 	@property
@@ -60,13 +60,14 @@ class Post(WPEntity):
 		Arguments for POST requests.
 		'''
 		if self._post_fields is None:
-			# Note that 'date' is excluded in favor of exclusive use of 'date_gmt'.
+			# Note that 'date' is excluded from the specification in favor of exclusive use of 'date_gmt'.
 			self._post_fields = ["date_gmt", "slug", "status", "password",
 								 "title", "content", "author", "excerpt", "featured_media",
 								 "comment_status", "ping_status", "format", "meta", "sticky",
 								 "template", "categories", "tags"]
 		return self._post_fields
 
+	@property
 	def post(self):
 		'''
 		Create a new Post.
@@ -140,14 +141,14 @@ class Post(WPEntity):
 			post_parameters["format"] = self.s.format
 
 		#meta
+		pass
+
+		#sticky
 		if self.s.sticky is not None:
 			if self.s.sticky == True:
 				post_parameters["sticky"] = "1"
 			else:
 				post_parameters["sticky"] = "0"
-
-		#sticky
-		pass
 
 		#template
 		pass
@@ -268,7 +269,7 @@ class Post(WPEntity):
 				self._author = self.api.user(id=self.s.author)  # ID for the author of the object
 				# TODO does this put the object in the cache?
 			except exc.NoEntityFound:
- 				raise exc.UserNotFound("User ID '{0}' not found.".format(self.author))
+				raise exc.UserNotFound("User ID '{0}' not found.".format(self.author))
 # 			ur = self.api.UserRequest()
 # 			ur.id = self.s.author # ID for the author of the object
 # 			user_list = ur.get()
@@ -386,8 +387,8 @@ class Post(WPEntity):
 class PostRequest(WPRequest):
 	'''
 	A class that encapsulates requests for WordPress posts.
-	'''		
-	def __init__(self, api=None, categories=None, slugs=None):		
+	'''
+	def __init__(self, api=None, categories=None, slugs=None):
 		super().__init__(api=api)
 		self.id = None # WordPress ID
 		self._post_fields = None
@@ -428,24 +429,17 @@ class PostRequest(WPRequest):
 		'''
 		Post request parameters.
 		'''
-		return ["context", "page", "per_page", "search", "after", "author",
-				"author_exclude", "before", "exclude", "include", "offset",
-				"order", "orderby", "slug", "status", "categories",
-				"categories_exclude", "tags", "tags_exclude", "sticky"]
-		
-	def get(self, classobject=Post, count=False, embed=True):
+		if self._parameter_names is None:
+			self._parameter_names = ["context", "page", "per_page", "search", "after", "author",
+									 "author_exclude", "before", "exclude", "include", "offset",
+									 "order", "orderby", "slug", "status", "categories",
+									 "categories_exclude", "tags", "tags_exclude", "sticky"]
+		return self._parameter_names
+	
+	def populate_request_parameters(self):
 		'''
-		Returns a list of 'Post' objects that match the parameters set in this object.
-		
-		count : Boolean, if True, only returns the number of objects found.
-		embed : include full content of linked resources in the response instead of just the ID, see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
-		'''		
-		if self.id:
-			self.url += "/{}".format(self.id)
-
-		# -------------------
-		# populate parameters
-		# -------------------
+		Populates 'self.parameters' to prepare for executing a request.
+		'''
 		if embed is True:
 			self.parameters["_embed"] = "true"
 
@@ -479,10 +473,12 @@ class PostRequest(WPRequest):
 			self.parameters["author_exclude"] = ",".join(self.author_exclude)
 			
 		# before : Limit response to posts published before a given ISO8601 compliant date.
-		# TODO
+		if self.before is not None:
+			raise NotImplementedError("Post parameter 'before' not yet implemented.")
 		
 		# exclude : Ensure result set excludes specific IDs.
-		# TODO
+		if self.exclude is not None:
+			raise NotImplementedError("Post parameter 'exclude' not yet implemented.")
 		
 		# include : Limit result set to specific IDs.
 		if len(self.include) > 0:
@@ -528,9 +524,20 @@ class PostRequest(WPRequest):
 		# sticky : Limit result set to items that are sticky.
 		if self.sticky:
 			self.parameters["sticky"] = "1"
-		
-		# -------------------
 
+	def get(self, class_object=Post, count=False, embed=True):
+		'''
+		Returns a list of 'Post' objects that match the parameters set in this object.
+		
+		count : Boolean, if True, only returns the number of objects found.
+		embed : include full content of linked resources in the response instead of just the ID,
+		        see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		'''		
+		#if self.id:
+		#	self.url += "/{}".format(self.id)
+
+		self.populate_request_parameters()
+		
 		try:
 			self.get_response()
 			logger.debug("URL='{}'".format(self.request.url))
@@ -544,101 +551,101 @@ class PostRequest(WPRequest):
 			
 			raise Exception("Unhandled HTTP response, code {0}. Error: \n{1}\n".format(self.response.status_code, self.response.json()))
 
-		
-		# read response headers
-		self.total = self.response.headers['X-WP-Total']
-		self.total_pages = self.response.headers['X-WP-TotalPages']
+		self.process_response_headers()
+
+		if count:
+			# return just the number of objects that match this request
+			if self.total is None:
+				raise Exception("Header 'X-WP-Total' was not found.") # if you are getting this, modify to use len(posts_data)
+			return self.total
+#		if count:
+#			return len(posts_data)
 
 		posts_data = self.response.json()
 
 		if isinstance(posts_data, dict):
 			# only one object was returned; make it a list
 			posts_data = [posts_data]
-	
-		if count:
-			return len(posts_data)
-	
+		
 		posts = list()
 		for d in posts_data:
 		
 			# Before we continue, do we have this Post in the cache already?
 			try:
 				post = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
-				posts.append(post)
-				continue
 			except WPORMCacheObjectNotFoundError:
-				pass
+				post = classobject.__new__(classobject) # default = Post()
+				post.__init__(api=self.api)
+				post.json = json.dumps(d)
+	
+				post.update_schema_from_dictionary(d)
 			
-			post = classobject.__new__(classobject)
-			post.__init__(api=self.api)
-			post.json = json.dumps(d)
-
-			post.update_schema_from_dictionary(d)
-		
-			# Check for embedded content
-			if "_embedded" in d:
-				embedded = d["_embedded"]
-				for key in embedded:
-				
-					# These are related objects, provided by the API in full.
-					# See if the objects are in the cache first, and if not, create them.
-				
-					if key == "author":
-						# value is a list of objects (dictionaries), only expecting one
-						author_obj = embedded[key][0]
-						try:
-							author = self.api.wordpress_object_cache.get(class_name=User.__name__, key=author_obj["id"])
-						except WPORMCacheObjectNotFoundError:
-							author = User(api=self.api)
-							author.update_schema_from_dictionary(author_obj)
-							self.api.wordpress_object_cache.set(value=author, keys=(author.s.id, author.s.slug))
-						
-						post.author = author
-
-					elif key == "wp:featuredmedia":
-						# value is a list of objects (dictionaries), only expecting one
-						media_obj = embedded[key][0]
-						try:
-							media = self.api.wordpress_object_cache.get(class_name=Media.__name__, key=media_obj["id"])
-						except WPORMCacheObjectNotFoundError:
-							media = Media(api=self.api)
-							media.update_schema_from_dictionary(media_obj)
-							self.api.wordpress_object_cache.set(value=media, keys=(media.s.id, media.s.slug))
-							
-						post.featured_media = media
+				# Check for embedded content
+				if "_embedded" in d:
+					embedded = d["_embedded"]
+					for key in embedded:
 					
-					elif key == "wp:term":
-						# value is list of lists,
-						# first list is a list of metadata objects (can potentially be different kinds, or is this strictly 'category'?)
-						# (this is not documented)
-						# see: https://www.sitepoint.com/wordpress-term-meta/
+						# These are related objects, provided by the API in full.
+						# See if the objects are in the cache first, and if not, create them.
+					
+						if key == "author":
+							# value is a list of objects (dictionaries), only expecting one
+							author_obj = embedded[key][0]
+							try:
+								author = self.api.wordpress_object_cache.get(class_name=User.__name__, key=author_obj["id"])
+							except WPORMCacheObjectNotFoundError:
+								author = User(api=self.api)
+								author.update_schema_from_dictionary(author_obj)
+								self.api.wordpress_object_cache.set(value=author, keys=(author.s.id, author.s.slug))
+							
+							post.author = author
+	
+						elif key == "wp:featuredmedia":
+							# value is a list of objects (dictionaries), only expecting one
+							media_obj = embedded[key][0]
+							try:
+								media = self.api.wordpress_object_cache.get(class_name=Media.__name__, key=media_obj["id"])
+							except WPORMCacheObjectNotFoundError:
+								media = Media(api=self.api)
+								media.update_schema_from_dictionary(media_obj)
+								self.api.wordpress_object_cache.set(value=media, keys=(media.s.id, media.s.slug))
+								
+							post.featured_media = media
 						
-						for term_list in embedded[key]:
-							if len(term_list) == 0:
-								continue
-							for category_obj in term_list:
-								if "taxonomy" in category_obj and category_obj["taxonomy"] in ["category", "post_tag", "nav_menu", "link_category", "post_format"]:
-									try:
-										category = self.api.wordpress_object_cache.get(class_name=Category.__name__,
-																					   key=category_obj["id"])
-									except WPORMCacheObjectNotFoundError:
-										category = Category(api=self.api)
-										category.update_schema_from_dictionary(category_obj)
-										self.api.wordpress_object_cache.set(value=category, keys=(category.s.id, category.s.slug))
-									
-									post.categories.append(category)
-									
-								else:
-									logger.warning("Unknown taxonomy encountered in _embedded data of Post (or something else entirely): {0}".format(json.dumps(term_list)))
-					else:
-						logger.debug("Note: Unhandled embedded content in {0}, key='{1}'".format(self.__class__.__name__, key))
-			
-			post.postprocess_response()
-			
-			# add to cache
-			self.api.wordpress_object_cache.set(value=post, keys=(post.s.id, post.s.slug))
-			
-			posts.append(post)
+						elif key == "wp:term":
+							# value is list of lists,
+							# first list is a list of metadata objects (can potentially be different kinds, or is this strictly 'category'?)
+							# (this is not documented)
+							# see: https://www.sitepoint.com/wordpress-term-meta/
+							
+							for term_list in embedded[key]:
+								if len(term_list) == 0:
+									continue
+								for category_obj in term_list:
+									if "taxonomy" in category_obj and category_obj["taxonomy"] in ["category", "post_tag", "nav_menu", "link_category", "post_format"]:
+										try:
+											category = self.api.wordpress_object_cache.get(class_name=Category.__name__,
+																						   key=category_obj["id"])
+										except WPORMCacheObjectNotFoundError:
+											category = Category(api=self.api)
+											category.update_schema_from_dictionary(category_obj)
+											self.api.wordpress_object_cache.set(value=category, keys=(category.s.id, category.s.slug))
+										
+										post.categories.append(category)
+										
+									else:
+										logger.warning("Unknown taxonomy encountered in _embedded data of Post (or something else entirely): {0}".format(json.dumps(term_list)))
+						else:
+							logger.debug("Note: Unhandled embedded content in {0}, key='{1}'".format(self.__class__.__name__, key))
+				
+				# perform postprocessing for custom fields
+				post.postprocess_response()
+				
+				# add to cache
+				self.api.wordpress_object_cache.set(value=post, keys=(post.s.id, post.s.slug))
+				
+			finally:
+				posts.append(post)
 			
 		return posts
 		
