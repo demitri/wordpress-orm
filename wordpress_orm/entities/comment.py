@@ -42,6 +42,17 @@ class Comment(WPEntity):
 								   "author_avatar_urls", "meta"]
 		return self._schema_fields
 	
+	@property
+	def post_fields(self):
+		'''
+		Arguments for POST requests.
+		'''
+		if self._post_fields is None:
+			# Note that 'date' is excluded from the specification in favor of exclusive use of 'date_gmt'.
+			self._post_fields = ["author", "author_email", "author_ip", "author_name", "author_url",
+								 "author_user_agent", "content", "date_gmt", "parent", "post", "status", "meta"]
+		return self._post_fields
+
 	def author(self):
 		'''
 		Return the WordPress User object that wrote this comment, if it was a WP User, None otherwise.
@@ -93,9 +104,8 @@ class CommentRequest(WPRequest):
 		'''
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 		
 		if self.password:
 			self.parameters["password"] = self.password
@@ -104,10 +114,17 @@ class CommentRequest(WPRequest):
 			logger.debug("Posts: {0}".format(self.posts))
 			self.parameters["post"] = ",".join(self.posts) # post ID
 
-	def get(self, class_object=Comment):
+	def get(self, class_object=Comment, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'Comment' objects that match the parameters set in this object.
+
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
 		'''
+		super().get(class_object=class_object, count=count, embed=embed, links=links)
 		
 		#if self.id:
 		#	self.url += "/{}".format(self.id)
@@ -146,10 +163,10 @@ class CommentRequest(WPRequest):
 
 			# Before we continue, do we have this Comment in the cache already?
 			try:
-				comment = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
+				comment = self.api.wordpress_object_cache.get(class_name=class_object.__name__, key=d["id"])
 			except WPORMCacheObjectNotFoundError:
 				# create new object
-				comment = classobject.__new__(classobject) # default = Comment()
+				comment = class_object.__new__(class_object) # default = Comment()
 				comment.__init__(api=self.api)
 				comment.json = json.dumps(d)
 				

@@ -42,16 +42,16 @@ class Media(WPEntity):
 		return self._schema_fields
 
 	@property
- 	def post_fields(self):
- 		'''
- 		Arguments for Media POST requests.
- 		'''
- 		if self._post_fields is None:
- 			# Note that 'date' is excluded in favor of exclusive use of 'date_gmt'.
- 			self._post_fields = ["date_gmt", "slug", "status", "title", "author",
- 								 "comment_status", "ping_status", "meta", "template",
- 								 "alt_text", "caption", "description", "post"]
- 		return self._post_fields
+	def post_fields(self):
+		'''
+		Arguments for Media POST requests.
+		'''
+		if self._post_fields is None:
+			# Note that 'date' is excluded in favor of exclusive use of 'date_gmt'.
+			self._post_fields = ["date_gmt", "slug", "status", "title", "author",
+								 "comment_status", "ping_status", "meta", "template",
+								 "alt_text", "caption", "description", "post"]
+		return self._post_fields
 
 	@property
 	def media_type(self):
@@ -95,6 +95,7 @@ class Media(WPEntity):
 
 class MediaRequest(WPRequest):
 	'''
+	A class that encapsulates requests for WordPress media items.
 	'''
 
 	def __init__(self, api=None):
@@ -124,9 +125,8 @@ class MediaRequest(WPRequest):
 		'''
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 
 		if self.page:
 			self.parameters["page"] = self.page
@@ -182,12 +182,17 @@ class MediaRequest(WPRequest):
 		if self.mime_type:
 			assert False, "Field 'mime_type' not yet implemented."
 
-	def get(self, class_object=Media, count=False):
+	def get(self, class_object=Media, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'Media' objects that match the parameters set in this object.
 
-		count : Boolean, if True, only returns the number of object found.
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
 		'''
+		super().get(class_object=class_object, count=count, embed=embed, links=links)
 		
 		#if self.id:
 		#	self.url += "/{}".format(self.id)
@@ -225,9 +230,9 @@ class MediaRequest(WPRequest):
 
 			# Before we continue, do we have this Media in the cache already?
 			try:
-				media = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
+				media = self.api.wordpress_object_cache.get(class_name=class_object.__name__, key=d["id"])
 			except WPORMCacheObjectNotFoundError:
-				media = classobject.__new__(classobject) # default = Media()
+				media = class_object.__new__(class_object) # default = Media()
 				media.__init__(api=self.api)
 				media.json = json.dumps(d)
 				

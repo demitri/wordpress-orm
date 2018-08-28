@@ -48,6 +48,18 @@ class Page(WPEntity):
 		return self._schema_fields
 
 	@property
+	def post_fields(self):
+		'''
+		Arguments for POST requests.
+		'''
+		if self._post_fields is None:
+			# Note that 'date' is excluded from the specification in favor of exclusive use of 'date_gmt'.
+			self._post_fields = ["date_gmt", "slug", "status", "password", "parent", "title", "content",
+								 "author", "excerpt", "featured_media", "comment_status", "ping_status",
+								 "menu_order", "meta", "template"]
+		return self._post_fields
+
+	@property
 	def featured_media(self):
 		'''
 		Returns the 'Media' object that is the "featured media" for this page.
@@ -130,12 +142,8 @@ class PageRequest(WPRequest):
 		'''
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			if count:
-				request_context = "embed" # only counting results, this is a shorter response
-			else:
-				request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 
 		if self.page:
 			self.parameters["page"] = self.page
@@ -171,13 +179,17 @@ class PageRequest(WPRequest):
 		if self.menu_order:
 			self.parameters["menu_order"] = self.menu_order
 	
-	def get(self, class_object=Page, count=False):
+	def get(self, class_object=Page, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'Page' objects that match the parameters set in this object.
 
-		count : Boolean, if True, only returns the number of objects found.
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
 		'''
-		
+		super().get(class_object=class_object, count=count, embed=embed, links=links)		
 
 		#if self.id:
 		#	self.url += "/{}".format(self.id)
@@ -216,10 +228,10 @@ class PageRequest(WPRequest):
 
 			# Before we continue, do we have this page in the cache already?
 			try:
-				page = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
+				page = self.api.wordpress_object_cache.get(class_name=class_object.__name__, key=d["id"])
 			except WPORMCacheObjectNotFoundError:
 				# create new object
-				page = classobject.__new__(classobject) # default = Page()
+				page = class_object.__new__(class_object) # default = Page()
 				page.__init__(api=self.api)
 				page.json = json.dumps(d)
 	

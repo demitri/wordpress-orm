@@ -132,7 +132,9 @@ class WPRequest(metaclass=ABCMeta):
 		self.nonce = None		# X-WP-Nonce
 		
 		self.api = api
+		self.url = None
 		self.parameters = dict()
+		self.context = None		# parameter found on all entities
 		self.response = None
 		self._parameter_names = None
 
@@ -150,20 +152,45 @@ class WPRequest(metaclass=ABCMeta):
 	def parameter_names(self):
 		pass
 
-	@abstractmethod
-	def get(self, class_object=None):
-		pass
+	def get(self, class_object=None, count=False, embed=True, links=True):
+		'''
+		Base implementation of the HTTP GET request to fetch WordPress entities.
+		
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
+		'''
+		if embed is True:
+			self.parameters["_embed"] = "true"
+		if links is True:
+			self.parameters["_links"] = "true"
+			
+		if count:
+			request_context = "embed" # only counting results, this is a shorter response
+		else:
+			request_context = "view" # default value
+			
+		# if the user set the 
 	
-	@abstractmethod
 	def process_response_headers(self):
 		'''
 		Handle any customization of parsing response headers, processes X-WP-* headers by default.
 		'''
 		# read response headers
+		# ---------------------
+		
+		# Pagination, ref: https://developer.wordpress.org/rest-api/using-the-rest-api/pagination/
+		#
+		# X-WP-Total      : total number of records in the collection
+		# X-WP-TotalPages : total number of pages encompassing all available records
+		#
 		if 'X-WP-Total' in self.response.headers:
-			self.total = self.response.headers['X-WP-Total']
+			self.total = int(self.response.headers['X-WP-Total'])
 		if 'X-WP-TotalPages' in self.response.headers:
-			self.total_pages = self.response.headers['X-WP-TotalPages']
+			self.total_pages = int(self.response.headers['X-WP-TotalPages'])
+			
 		if 'X-WP-Nonce' in self.response.headers:
 			self.nonce = self.response.headers['X-WP-Nonce']
 	
@@ -177,7 +204,7 @@ class WPRequest(metaclass=ABCMeta):
 			if wpid is None:
 				url = self.url
 			else:
-				url += "/{}".format(wpid)
+				url = "{0}/{1}".format(self.url, wpid)
 		
 			if self.api.session is None:
 				#logger.debug("creating new request")

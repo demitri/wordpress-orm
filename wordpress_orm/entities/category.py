@@ -36,44 +36,6 @@ class Category(WPEntity):
 			self._schema_fields = ["id", "count", "description", "link", "name", "slug", "taxonomy", "parent", "meta"]
 		return self._schema_fields
 	
-	# Pass-through properties
-	# -----------------------
-# 	@property
-# 	def id(self):
-# 		return self.s.id
-# 
-# 	@property
-# 	def count(self):
-# 		return self.s.count
-# 
-# 	@property
-# 	def description(self):
-# 		return self.s.description
-# 
-# 	@property
-# 	def link(self):
-# 		return self.s.link
-# 
-# 	@property
-# 	def name(self):
-# 		return self.s.name
-# 
-# 	@property
-# 	def slug(self):
-# 		return self.s.slug
-# 
-# 	@property
-# 	def taxonomy(self):
-# 		return self.s.taxonomy
-# 
-# 	@property
-# 	def parent(self):
-# 		return self.s.parent
-# 
-# 	@property
-# 	def meta(self):
-# 		return self.s.meta
-
 	@property
 	def post_fields(self):
 		'''
@@ -83,7 +45,6 @@ class Category(WPEntity):
 			self._post_fields = ["description", "name", "slug", "parent", "meta"]
 		return self._post_fields
 
-	
 	def posts(self):
 		'''
 		Return a list of posts (type: Post) that have this category.
@@ -124,18 +85,24 @@ class CategoryRequest(WPRequest):
 		'''
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 
 		for param in self.parameter_names:
 			if getattr(self, param, None):
 				self.parameters[param] = getattr(self, param)
 
-	def get(self, class_object=Category, count=False):
+	def get(self, class_object=Category, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'Category' objects that match the parameters set in this object.
+
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
 		'''
+		super().get(class_object=class_object, count=count, embed=embed, links=links)
 		
 		#if self.id:
 		#	self.url += "/{}".format(self.id)
@@ -178,10 +145,8 @@ class CategoryRequest(WPRequest):
 			try:
 				logger.debug(d)
 				category = self.api.wordpress_object_cache.get(class_object.__name__, key=d["id"]) # default = Category()
-				categories.append(category)
-				continue
 			except WPORMCacheObjectNotFoundError:
-				category = classobject.__new__(classobject) # default = Category()
+				category = class_object.__new__(class_object) # default = Category()
 				category.__init__(api=self.api)
 				category.json = json.dumps(d)
 				

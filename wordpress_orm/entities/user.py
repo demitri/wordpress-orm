@@ -33,6 +33,13 @@ class User(WPEntity):
 				   "roles", "password", "capabilities", "extra_capabilities", "avatar_urls", "meta"]
 		return self._schema_fields
 
+	@property
+	def post_fields(self):
+		if self._post_fields is None:
+			self._post_fields = ["username", "name", "first_name", "last_name", "email", "url", 
+								 "description", "locale", "nickname", "slug", "roles", "password", "meta"]
+		return self._post_fields
+
 	def commit(self):
 		'''
 		Creates a new user or updates an existing user via the API.
@@ -156,9 +163,8 @@ class UserRequest(WPRequest):
 		'''
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 
 		if self.page:
 			self.parameters["page"] = self.page
@@ -175,7 +181,7 @@ class UserRequest(WPRequest):
 
 		# include : Limit result set to specific IDs.
 		if len(self._includes) > 0:
-			self.parameters["include"] = ",".join.self._includes
+			self.parameters["include"] = ",".join.self.includes
 			
 		# offset : Offset the result set by a specific number of items.
 		if self.offset:
@@ -197,13 +203,17 @@ class UserRequest(WPRequest):
 		if len(self.roles) > 0:
 			self.parameters["roles"] = ",".join(self.roles)
 
-	def get(self, class_object=User, count=False):
+	def get(self, class_object=User, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'Tag' objects that match the parameters set in this object.
-
-		count : Boolean, if True, only returns the number of object found.
-		'''
 		
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
+		'''
+		super().get(class_object=class_object, count=count, embed=embed, links=links)
 		#if self.id:
 		#	self.url += "/{}".format(self.id)
 		
@@ -244,11 +254,9 @@ class UserRequest(WPRequest):
 
 			# Before we continue, do we have this User in the cache already?
 			try:
-				user = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
-				users.append(user)
-				continue
+				user = self.api.wordpress_object_cache.get(class_name=class_object.__name__, key=d["id"])
 			except WPORMCacheObjectNotFoundError:
-				user = classobject.__new__(classobject)
+				user = class_object.__new__(class_object)
 				user.__init__(api=self.api)
 				user.json = json.dumps(d)
 				
@@ -460,9 +468,3 @@ class UserRequest(WPRequest):
 			else:
 				raise ValueError("Unexpected type for property list 'roles'; expected str, got '{0}'".format(type(s)))
 			
-
-
-
-
-
-

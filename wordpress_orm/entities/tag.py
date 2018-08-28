@@ -40,6 +40,12 @@ class Tag(WPEntity):
 								   "name", "slug", "taxonomy", "meta"]
 		return self._schema_fields
 
+	@property
+	def post_fields(self):
+		if self._post_fields is None:
+			self._post_fields = ["description", "name", "slug", "meta"]
+		return self._post_fields
+
 class TagRequest(WPRequest):
 	'''
 	A class that encapsulates requests for WordPress tags.
@@ -82,12 +88,8 @@ class TagRequest(WPRequest):
 		'''
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			if count:
-				request_context = "embed" # only counting results, this is a shorter response
-			else:
-				request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 
 		if self.page:
 			self.parameters["page"] = self.page
@@ -119,13 +121,18 @@ class TagRequest(WPRequest):
 		if self.order:
 			self.parameters["order"] = self.order
 
-	def get(self, class_object=Tag, count=False):
+	def get(self, class_object=Tag, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'Tag' objects that match the parameters set in this object.
-
-		count : Boolean, if True, only returns the number of object found.
-		'''
 		
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
+		'''
+		super().get(class_object=class_object, count=count, embed=embed, links=links)
+
 		#if self.id:
 		#	self.url += "/{}".format(self.id)
 
@@ -163,10 +170,10 @@ class TagRequest(WPRequest):
 
 			# Before we continue, do we have this page in the cache already?
 			try:
-				tag = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
+				tag = self.api.wordpress_object_cache.get(class_name=class_object.__name__, key=d["id"])
 			except WPORMCacheObjectNotFoundError:
 
-				tag = classobject.__new__(classobject) # default = Tag()
+				tag = class_object.__new__(class_object) # default = Tag()
 				tag.__init__(api=self.api)
 				tag.json = json.dumps(d)
 	

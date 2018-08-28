@@ -27,7 +27,14 @@ class PostStatus(WPEntity):
 
 	@property
 	def schema_fields(self):
-		return ["name", "private", "protected", "public", "queryable", "show_in_list", "slug"]
+		if self._schema_fields is None:
+			self._schema_fields = ["name", "private", "protected", "public", "queryable", "show_in_list", "slug"]
+		return self._schema_fields
+
+	@property
+	def post_fields(self):
+		raise Exception("There is no WordPress API to create 'PostStatus' objects.")
+	
 
 class PostStatusRequest(WPRequest):
 	'''
@@ -61,19 +68,20 @@ class PostStatusRequest(WPRequest):
 		'''
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			if count:
-				request_context = "embed" # only counting results, this is a shorter response
-			else:
-				request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 	
-	def get(self, class_object=PostStatus, count=False):
+	def get(self, class_object=PostStatus, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'PostStatus' objects that match the parameters set in this object.
 		
-		count : Boolean, if True, only returns the number of objects found.
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
 		'''
+		super().get(class_object=class_object, count=count, embed=embed, links=links)
 		
 		populate_request_parameters() # populates 'self.parameters'
 		
@@ -107,7 +115,7 @@ class PostStatusRequest(WPRequest):
 		
 			# TODO: check cache? This is not an object that has an ID
 
-			post_status = classobject.__new__(classobject) # default = PostStatus()
+			post_status = class_object.__new__(class_object) # default = PostStatus()
 			post_status.__init__(api=self.api)
 			post_status.json = json.dumps(d)
 			

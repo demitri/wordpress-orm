@@ -413,6 +413,7 @@ class PostRequest(WPRequest):
 		self._author_ids = list()
 		self._author_exclude = list()
 		self._includes = list()
+		self._excludes = list()
 		self._slugs = list()
 		self._category_ids = list()
 		self._categories_exclude_ids = list()
@@ -440,17 +441,10 @@ class PostRequest(WPRequest):
 		'''
 		Populates 'self.parameters' to prepare for executing a request.
 		'''
-		if embed is True:
-			self.parameters["_embed"] = "true"
-
 		if self.context:
 			self.parameters["context"] = self.context
-			request_context = self.context
 		else:
-			if count:
-				request_context = "embed" # only counting results, this is a shorter response
-			else:
-				request_context = "view" # default value
+			self.parameters["context"] = "view" # default value
 			
 		if self.page:
 			self.parameters["page"] = self.page
@@ -462,7 +456,7 @@ class PostRequest(WPRequest):
 			self.parameters["search"] = self.search
 			
 		if self.after:
-			self.parameters["after"] = self._after.isoformat()
+			self.parameters["after"] = self.after.isoformat()
 
 		if len(self.author) > 0:
 			# takes a list of author IDs
@@ -474,11 +468,11 @@ class PostRequest(WPRequest):
 			
 		# before : Limit response to posts published before a given ISO8601 compliant date.
 		if self.before is not None:
-			raise NotImplementedError("Post parameter 'before' not yet implemented.")
+			self.parameters["before"] = self.before.isoformat()
 		
 		# exclude : Ensure result set excludes specific IDs.
-		if self.exclude is not None:
-			raise NotImplementedError("Post parameter 'exclude' not yet implemented.")
+		if len(self.exclude) > 0:
+			self.parameters["exclude"] = ",".join(self.exclude)
 		
 		# include : Limit result set to specific IDs.
 		if len(self.include) > 0:
@@ -525,16 +519,23 @@ class PostRequest(WPRequest):
 		if self.sticky:
 			self.parameters["sticky"] = "1"
 
-	def get(self, class_object=Post, count=False, embed=True):
+	def get(self, class_object=Post, count=False, embed=True, links=True):
 		'''
 		Returns a list of 'Post' objects that match the parameters set in this object.
 		
-		count : Boolean, if True, only returns the number of objects found.
-		embed : include full content of linked resources in the response instead of just the ID,
-		        see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		class_object : the class of the objects to instantiate based on the response, used when implementing custom subclasses
+		count        : BOOL, return the number of entities matching this request, not the objects themselves
+		embed        : BOOL, if True, embed details on linked resources (e.g. URLs) instead of just an ID in response to reduce number of HTTPS calls needed,
+			           see: https://developer.wordpress.org/rest-api/using-the-rest-api/linking-and-embedding/#embedding
+		links        : BOOL, if True, returns with response a map of links to other API resources
 		'''		
+		super().get(class_object=class_object, count=count, embed=embed, links=links)
+
 		#if self.id:
 		#	self.url += "/{}".format(self.id)
+
+		if embed is True:
+			self.parameters["_embed"] = "true"
 
 		self.populate_request_parameters()
 		
@@ -572,9 +573,9 @@ class PostRequest(WPRequest):
 		
 			# Before we continue, do we have this Post in the cache already?
 			try:
-				post = self.api.wordpress_object_cache.get(class_name=classobject.__name__, key=d["id"])
+				post = self.api.wordpress_object_cache.get(class_name=class_object.__name__, key=d["id"])
 			except WPORMCacheObjectNotFoundError:
-				post = classobject.__new__(classobject) # default = Post()
+				post = class_object.__new__(class_object) # default = Post()
 				post.__init__(api=self.api)
 				post.json = json.dumps(d)
 	
@@ -833,7 +834,7 @@ class PostRequest(WPRequest):
 		'''
 		WordPress parameter to return posts before this date.
 		'''
-		return self._after
+		return self._before
 	
 	@after.setter
 	def before(self, value):
@@ -867,14 +868,14 @@ class PostRequest(WPRequest):
 		elif not isinstance(values, list):
 			raise ValueError("'excludes' must be provided as a list (or append to the existing list).")
 		
-		for excl in values:
-			if isinstance(inc, int):
-				self._includes.append(str(inc))
-			elif isinstance(inc, str):
+		for exclude_id in values:
+			if isinstance(exclude_id, int):
+				self._excludes.append(str(exclude_id))
+			elif isinstance(exclude_id, str):
 				try:
-					self._includes.append(str(int(inc)))
+					self._includes.append(str(int(exclude_id)))
 				except ValueError:
-					raise ValueError("The WordPress ID (an integer, '{0}' given) must be provided to limit result to specific users.".format(inc))
+					raise ValueError("The WordPress ID (an integer, '{0}' given) must be provided to limit result to specific users.".format(exclude_id))
 
 	@property
 	def include(self):
@@ -892,14 +893,14 @@ class PostRequest(WPRequest):
 		elif not isinstance(values, list):
 			raise ValueError("Includes must be provided as a list (or append to the existing list).")
 		
-		for inc in values:
-			if isinstance(inc, int):
-				self._includes.append(str(inc))
-			elif isinstance(inc, str):
+		for include_id in values:
+			if isinstance(include_id, int):
+				self._includes.append(str(include_id))
+			elif isinstance(include_id, str):
 				try:
-					self._includes.append(str(int(inc)))
+					self._includes.append(str(int(include_id)))
 				except ValueError:
-					raise ValueError("The WordPress ID (an integer, '{0}' given) must be provided to limit result to specific users.".format(inc))
+					raise ValueError("The WordPress ID (an integer, '{0}' given) must be provided to limit result to specific users.".format(include_id))
 
 	@property
 	def offset(self):
