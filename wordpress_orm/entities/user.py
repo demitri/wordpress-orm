@@ -11,7 +11,8 @@ from .wordpress_entity import WPEntity, WPRequest, context_values
 from ..cache import WPORMCacheObjectNotFoundError
 from ..exc import AuthenticationRequired, MissingRequiredParameter
 
-logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
+package_name = __name__.split(".")[0]
+logger = logging.getLogger(package_name) # package name
 
 class User(WPEntity):
 	

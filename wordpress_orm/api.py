@@ -21,7 +21,8 @@ from .entities import Tag
 #from .entities import Taxonomy
 from .entities import User
 
-logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
+package_name = __name__.split(".")[0]
+logger = logging.getLogger(package_name) # package name
 
 @contextmanager
 def wp_session(api=None):

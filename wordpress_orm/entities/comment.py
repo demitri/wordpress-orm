@@ -11,7 +11,8 @@ from .post import Post
 from ..import exc
 from ..cache import WPORMCacheObjectNotFoundError
 
-logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
+package_name = __name__.split(".")[0]
+logger = logging.getLogger(package_name) # package name
 
 order_values = ["asc", "desc"]
 orderby_values = ["date", "date_gmt", "id", "include", "post", "parent", "type"]

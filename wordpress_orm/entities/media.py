@@ -13,7 +13,8 @@ import requests
 from .wordpress_entity import WPEntity, WPRequest, context_values
 from ..cache import WPORMCache, WPORMCacheObjectNotFoundError
 
-logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
+package_name = __name__.split(".")[0]
+logger = logging.getLogger(package_name) # package name
 
 status_values = ["publish", "future", "draft", "pending", "private"]
 

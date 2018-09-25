@@ -10,7 +10,8 @@ from .wordpress_entity import WPEntity, WPRequest
 
 from .. import exc
 
-logger = logging.getLogger("{}".format(__loader__.name.split(".")[0])) # package name
+package_name = __name__.split(".")[0]
+logger = logging.getLogger(package_name) # package name
 
 class PostStatus(WPEntity):
 		
