@@ -5,7 +5,7 @@ from contextlib import contextmanager
 import requests
 
 from .entities import post, user, media, category, comment, page, tag
-from . import exc
+from . import exc, logger
 from .cache import WPORMCache, WPORMCacheObjectNotFoundError
 
 from .entities import Category
@@ -21,8 +21,8 @@ from .entities import Tag
 #from .entities import Taxonomy
 from .entities import User
 
-package_name = __name__.split(".")[0]
-logger = logging.getLogger(package_name) # package name
+#package_name = __name__.split(".")[0]
+#logger = logging.getLogger(package_name) # package name
 
 @contextmanager
 def wp_session(api=None):

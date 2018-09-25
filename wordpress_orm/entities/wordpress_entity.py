@@ -5,8 +5,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 
 import requests
 
-package_name = __name__.split(".")[0]
-logger = logging.getLogger(package_name) # package name
+logger = logging.getLogger(__name__.split(".")[0]) # package name
 
 context_values = ["view", "embed", "edit"]
 

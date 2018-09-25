@@ -17,8 +17,7 @@ from .media import Media
 from .. import exc
 from ..cache import WPORMCacheObjectNotFoundError
 
-package_name = __name__.split(".")[0]
-logger = logging.getLogger(package_name) # package name
+logger = logging.getLogger(__name__.split(".")[0]) # package name
 
 order_values = ["asc", "desc"]
 orderby_values = ["author", "date", "id", "include", "modified", "parent",
